@@ -123,6 +123,7 @@ treated as full-dataset results.
 ## Repository contents
 
 - `data/pdfs/`: locally cached source PDFs; excluded from Git.
+- `data/pdf links.txt`: filename list with arXiv abstract and direct PDF links.
 - `data/thesis_dataset.jsonl`: generated evaluation instances.
 - `scripts/build_dataset.py`: local PDF and citation dataset builder.
 - `scripts/run_experiments.py`: BM25, MiniLM, and Ollama evaluation.
