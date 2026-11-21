@@ -46,10 +46,11 @@ class CachedLLMVerifier:
     comparisons are 100% deterministic, fast, and crash-safe.
     """
 
-    def __init__(self, ollama_url: str, model: str, cache_path: Path):
+    def __init__(self, ollama_url: str, model: str, cache_path: Path, request_timeout: float):
         self.ollama_url = ollama_url.rstrip("/")
         self.model = model
         self.cache_path = cache_path
+        self.request_timeout = request_timeout
         self.cache: Dict[str, Dict] = {}
         if cache_path.exists():
             for line in cache_path.read_text(encoding="utf-8").splitlines():
@@ -86,7 +87,7 @@ class CachedLLMVerifier:
                 "stream": False,
                 "options": {"temperature": 0.0, "num_predict": 10},
             },
-            timeout=120,
+            timeout=self.request_timeout,
         )
         response.raise_for_status()
         response_data = response.json()
@@ -215,9 +216,11 @@ def format_summary_text(comparison: List[Dict]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate passage ranking + Ollama verification savings.")
     parser.add_argument("--dataset", default="data/thesis_dataset.jsonl")
-    parser.add_argument("--limit", type=int, default=0, help="0 = full dataset; >0 = pilot subset size")
+    parser.add_argument("--start-index", type=int, default=0, help="First dataset row to evaluate")
+    parser.add_argument("--limit", type=int, default=0, help="0 = all remaining rows; >0 = rows to evaluate")
     parser.add_argument("--max-checks", type=int, default=0, help="Max passages checked per source (0 = all)")
     parser.add_argument("--model", default="qwen2.5:3b", help="Ollama model name")
+    parser.add_argument("--request-timeout", type=float, default=120.0, help="Ollama request timeout in seconds")
     parser.add_argument(
         "--ollama-url",
         default=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
@@ -225,18 +228,33 @@ def main() -> None:
     )
     parser.add_argument("--results-dir", default="results")
     args = parser.parse_args()
+    if args.start_index < 0:
+        parser.error("--start-index must be 0 or greater")
+    if args.limit < 0:
+        parser.error("--limit must be 0 or greater")
+
     ollama_url = args.ollama_url
     if "://" not in ollama_url:
         ollama_url = f"http://{ollama_url}"
 
     raw_lines = Path(args.dataset).read_text(encoding="utf-8").splitlines()
-    instances = [json.loads(line) for line in raw_lines if line.strip()]
-    if args.limit > 0:
-        instances = instances[: args.limit]
+    all_instances = [json.loads(line) for line in raw_lines if line.strip()]
+    if args.start_index >= len(all_instances):
+        parser.error(f"--start-index must be less than dataset size ({len(all_instances)})")
+    end_index = len(all_instances) if args.limit == 0 else min(args.start_index + args.limit, len(all_instances))
+    instances = all_instances[args.start_index:end_index]
 
-    print(f"Loaded {len(instances)} instances from {args.dataset}")
+    print(f"Loaded {len(instances)} instances (rows {args.start_index}-{end_index - 1}) from {args.dataset}")
 
-    verifier = CachedLLMVerifier(ollama_url, args.model, Path("logs/llm_verification_cache.jsonl"))
+    if args.request_timeout <= 0:
+        parser.error("--request-timeout must be greater than 0")
+
+    verifier = CachedLLMVerifier(
+        ollama_url,
+        args.model,
+        Path("logs/llm_verification_cache.jsonl"),
+        args.request_timeout,
+    )
     embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
     # 1. Unranked Baseline (document order: 0, 1, ..., N-1)

@@ -94,6 +94,29 @@ To evaluate the full dataset, omit `--limit` or set it to `0`. A
 `--max-checks` value of `0` checks all paragraphs. Full evaluation can make
 many local model requests and take substantially longer than the pilot.
 
+For long full-dataset runs, use restartable 25-instance batches instead:
+
+```bash
+.venv/bin/python scripts/run_experiment_batches.py \
+  --batch-size 25 \
+  --max-checks 0 \
+  --model qwen2.5:3b \
+  --ollama-url http://localhost:11434
+```
+
+Each completed batch is saved under `results/batches/` and skipped on restart.
+If Ollama fails during a batch, restart the same command with
+`--start-index` set to the beginning row of the failed batch; the verifier
+cache avoids repeating successful passage checks. The batch runner checks that
+Ollama is responding and that the requested model is installed before starting.
+Each request has a 120-second timeout by default; adjust it with
+`--request-timeout` if needed. After all batches complete, combine them into
+the full-dataset reports with:
+
+```bash
+.venv/bin/python scripts/merge_experiment_batches.py
+```
+
 Each run writes:
 
 - `summary_metrics.json`: aggregate metrics for the three strategies.
@@ -129,3 +152,4 @@ treated as full-dataset results.
 - `scripts/run_experiments.py`: BM25, MiniLM, and Ollama evaluation.
 - `logs/llm_verification_cache.jsonl`: cached local verifier responses.
 - `results_pilot/`: pilot aggregate metrics, detailed logs, and text summary.
+- `results/batches/`: restartable full-dataset batch outputs before merging.
