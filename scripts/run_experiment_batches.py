@@ -49,7 +49,7 @@ def main() -> int:
     )
     parser.add_argument("--dataset", default="data/thesis_dataset.jsonl")
     parser.add_argument("--start-index", type=int, default=0, help="Dataset row to resume from")
-    parser.add_argument("--batch-size", type=int, default=25)
+    parser.add_argument("--batch-size", type=int, default=75)
     parser.add_argument("--max-checks", type=int, default=0, help="0 checks all paragraphs")
     parser.add_argument("--model", default="qwen2.5:3b")
     parser.add_argument("--ollama-url", default="http://localhost:11434")

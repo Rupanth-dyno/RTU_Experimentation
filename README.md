@@ -94,7 +94,7 @@ To evaluate the full dataset, omit `--limit` or set it to `0`. A
 `--max-checks` value of `0` checks all paragraphs. Full evaluation can make
 many local model requests and take substantially longer than the pilot.
 
-For long full-dataset runs, use restartable 25-instance batches instead:
+For long full-dataset runs, use restartable 75-instance batches instead:
 
 ```bash
 .venv/bin/python scripts/run_experiment_batches.py \
@@ -105,6 +105,7 @@ For long full-dataset runs, use restartable 25-instance batches instead:
 ```
 
 Each completed batch is saved under `results/batches/` and skipped on restart.
+The 800-row dataset runs as 11 batches at this size.
 If Ollama fails during a batch, restart the same command with
 `--start-index` set to the beginning row of the failed batch; the verifier
 cache avoids repeating successful passage checks. The batch runner checks that

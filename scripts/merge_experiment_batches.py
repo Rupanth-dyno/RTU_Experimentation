@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Dict, List
 
@@ -57,7 +58,13 @@ def main() -> None:
     ]
     dataset_ids = [entry["instance_id"] for entry in dataset_rows]
     batches_dir = Path(args.batches_dir)
-    batch_files = sorted(batches_dir.glob("batch_*/detailed_logs.json"))
+    batch_files = sorted(
+        batches_dir.glob("batch_*/detailed_logs.json"),
+        key=lambda path: tuple(
+            int(part)
+            for part in re.fullmatch(r"batch_(\d+)_(\d+)", path.parent.name).groups()
+        ),
+    )
     if not batch_files:
         parser.error(f"No batch outputs found in {batches_dir}")
 
