@@ -4,10 +4,18 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
-from run_experiments import format_summary_text
-
 
 STRATEGIES = ("Unranked_Baseline", "BM25_Ranked", "MiniLM_Dense_Ranked")
+
+
+def format_summary_text(comparison: List[Dict]) -> str:
+    return "\n".join(
+        [
+            "================ FINAL THESIS EXPERIMENT SUMMARY ================",
+            *(json.dumps(row, indent=2) for row in comparison),
+            "",
+        ]
+    )
 
 
 def summarize(strategy: str, logs: List[Dict]) -> Dict:
