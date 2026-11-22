@@ -98,7 +98,7 @@ For long full-dataset runs, use restartable 75-instance batches instead:
 
 ```bash
 .venv/bin/python scripts/run_experiment_batches.py \
-  --batch-size 25 \
+  --batch-size 75 \
   --max-checks 0 \
   --model qwen2.5:3b \
   --ollama-url http://localhost:11434
@@ -117,6 +117,22 @@ the full-dataset reports with:
 ```bash
 .venv/bin/python scripts/merge_experiment_batches.py
 ```
+
+To compare retrieval at fixed passage limits using ranks and verdicts from the
+completed full run (without making additional Ollama calls), run:
+
+```bash
+.venv/bin/python scripts/evaluate_cached_budgets.py \
+  --dataset data/thesis_dataset.jsonl \
+  --detailed-logs results/detailed_logs.json \
+  --budgets 1,3,5,10,20,30,50,0 \
+  --output-dir results/budget_eval
+```
+
+Here, budget `0` means all passages. The report includes precision and false
+positive/negative counts. These are exploratory fixed-budget results derived
+from the completed full run; they do not represent a new verifier or an
+independent test set.
 
 Each run writes:
 
@@ -154,3 +170,12 @@ treated as full-dataset results.
 - `logs/llm_verification_cache.jsonl`: cached local verifier responses.
 - `results_pilot/`: pilot aggregate metrics, detailed logs, and text summary.
 - `results/batches/`: restartable full-dataset batch outputs before merging.
+- `results/budget_eval/`: fixed-budget evaluation using cached verifier judgments.
+
+The fixed-budget analysis found a small operating-point tradeoff: at 30
+passages, BM25 and MiniLM both reached 60.50% overall accuracy, with 34.75%
+positive-source accuracy and 86.25% negative-distractor accuracy. Exhaustive
+evaluation reached 60.00%, 35.75%, and 84.25%, respectively. This is not a
+general improvement to positive-source accuracy; it suggests that retrieval
+budget and ranking are worth testing with a changed verifier or improved
+evidence labels in a separate experiment.
