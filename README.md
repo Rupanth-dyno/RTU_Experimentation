@@ -160,6 +160,75 @@ for overall accuracy, positive-source accuracy, and wall time. These results
 are specific to this sample, model, and five-passage limit; they should not be
 treated as full-dataset results.
 
+## Full-scale experiment
+
+The full-scale run evaluated all **800 instances** (400 positive and 400
+negative) with Qwen 2.5 3B through local Ollama. The run used restartable
+75-instance batches and `--max-checks 0` (check passages until support is found
+or the passages are exhausted). Batch outputs were merged into the full-run
+summary and per-instance logs.
+
+| Task | Work completed | Output |
+|---|---|---|
+| 1. Run the full dataset | Evaluated all 800 instances for the unranked, BM25, and MiniLM strategies | `results/batches/` |
+| 2. Merge batch results | Combined batch outputs into the aggregate metrics and detailed per-instance logs | `results/summary_metrics.json`, `results/summary_metrics.txt`, `results/detailed_logs.json` |
+| 3. Compare retrieval budgets | Derived predictions for limits of 1, 3, 5, 10, 20, 30, and 50 passages, plus all passages, using recorded full-run ranks; no additional Ollama calls | `results/budget_eval/` |
+
+### Full-scale results
+
+| Strategy | Accuracy | Positive-source accuracy | Negative-distractor accuracy | Recall@5 | MRR | LLM checks | Avg. checks/instance | Wall time |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Unranked baseline | 60.00% | 35.75% | 84.25% | 24.25% | 0.1833 | 31,796 | 39.74 | 13h 42m 57s |
+| BM25 ranked | 60.00% | 35.75% | 84.25% | 21.50% | 0.1507 | 31,198 | 39.00 | 13h 30m 51s |
+| MiniLM dense ranked | 60.00% | 35.75% | 84.25% | 22.25% | 0.1523 | 31,204 | 39.01 | 13h 32m 01s |
+
+All three strategies produced the same final predictions when allowed to
+exhaust the passages. Ranking therefore did not improve full-run accuracy.
+BM25 and MiniLM used slightly fewer verifier checks than the baseline, but
+ranking time reduced the net wall-time savings to about 1.5% and 1.3%,
+respectively.
+
+### Fixed-budget results
+
+These are exploratory operating points reconstructed from the full-run
+`found_at_rank` values. At each budget, a prediction is positive only if the
+recorded support rank falls within that limit; otherwise it is negative. The
+`all` rows reproduce the exhaustive full-scale results. This is not a new
+verifier run or an independent test set.
+
+| Budget | Strategy | Accuracy | Positive-source accuracy | Negative-distractor accuracy | Positive precision | FP | FN | Checks |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | Unranked baseline | 53.50% | 13.25% | 93.75% | 67.95% | 25 | 347 | 800 |
+| 1 | BM25 ranked | 54.13% | 9.75% | 98.50% | 86.67% | 6 | 361 | 800 |
+| 1 | MiniLM dense ranked | 53.12% | 8.50% | 97.75% | 79.07% | 9 | 366 | 800 |
+| 3 | Unranked baseline | 56.37% | 21.25% | 91.50% | 71.43% | 34 | 315 | 2,217 |
+| 3 | BM25 ranked | 56.13% | 16.75% | 95.50% | 78.82% | 18 | 333 | 2,289 |
+| 3 | MiniLM dense ranked | 56.50% | 19.50% | 93.50% | 75.00% | 26 | 322 | 2,277 |
+| 5 | Unranked baseline | 57.50% | 24.25% | 90.75% | 72.39% | 37 | 303 | 3,573 |
+| 5 | BM25 ranked | 57.75% | 21.50% | 94.00% | 78.18% | 24 | 314 | 3,705 |
+| 5 | MiniLM dense ranked | 57.63% | 22.25% | 93.00% | 76.07% | 28 | 311 | 3,661 |
+| 10 | Unranked baseline | 58.50% | 27.00% | 90.00% | 72.97% | 40 | 292 | 6,864 |
+| 10 | BM25 ranked | 59.00% | 26.75% | 91.25% | 75.35% | 35 | 293 | 7,090 |
+| 10 | MiniLM dense ranked | 59.75% | 29.25% | 90.25% | 75.00% | 39 | 283 | 6,995 |
+| 20 | Unranked baseline | 60.12% | 31.50% | 88.75% | 73.68% | 45 | 274 | 13,157 |
+| 20 | BM25 ranked | 60.25% | 32.50% | 88.00% | 73.03% | 48 | 270 | 13,382 |
+| 20 | MiniLM dense ranked | 60.00% | 32.75% | 87.25% | 71.98% | 51 | 269 | 13,181 |
+| 30 | Unranked baseline | 59.38% | 32.50% | 86.25% | 70.27% | 55 | 270 | 18,597 |
+| 30 | BM25 ranked | 60.50% | 34.75% | 86.25% | 71.65% | 55 | 261 | 18,745 |
+| 30 | MiniLM dense ranked | 60.50% | 34.75% | 86.25% | 71.65% | 55 | 261 | 18,527 |
+| 50 | Unranked baseline | 59.38% | 34.00% | 84.75% | 69.04% | 61 | 264 | 23,414 |
+| 50 | BM25 ranked | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 23,318 |
+| 50 | MiniLM dense ranked | 60.38% | 35.50% | 85.25% | 70.65% | 59 | 258 | 23,154 |
+| All | Unranked baseline | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 31,796 |
+| All | BM25 ranked | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 31,198 |
+| All | MiniLM dense ranked | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 31,204 |
+
+At 30 passages, BM25 and MiniLM have the highest overall accuracy (60.50%),
+but positive-source accuracy (34.75%) remains below the exhaustive result
+(35.75%). The budget curve shows a tradeoff between recovering positive
+sources and rejecting negative distractors; these results alone do not
+establish a general accuracy improvement.
+
 ## Repository contents
 
 - `data/pdfs/`: locally cached source PDFs; excluded from Git.
@@ -171,11 +240,3 @@ treated as full-dataset results.
 - `results_pilot/`: pilot aggregate metrics, detailed logs, and text summary.
 - `results/batches/`: restartable full-dataset batch outputs before merging.
 - `results/budget_eval/`: fixed-budget evaluation using cached verifier judgments.
-
-The fixed-budget analysis found a small operating-point tradeoff: at 30
-passages, BM25 and MiniLM both reached 60.50% overall accuracy, with 34.75%
-positive-source accuracy and 86.25% negative-distractor accuracy. Exhaustive
-evaluation reached 60.00%, 35.75%, and 84.25%, respectively. This is not a
-general improvement to positive-source accuracy; it suggests that retrieval
-budget and ranking are worth testing with a changed verifier or improved
-evidence labels in a separate experiment.
