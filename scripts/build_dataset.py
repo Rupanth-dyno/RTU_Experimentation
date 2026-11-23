@@ -1,12 +1,12 @@
 import argparse
 import json
+import hashlib
 import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 import numpy as np
 import pymupdf
@@ -14,7 +14,12 @@ from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 
-def parse_local_pdf(pdf_path: Path, min_words: int = 90, max_words: int = 250) -> Optional[Dict]:
+def parse_local_pdf(
+    pdf_path: Path,
+    min_words: int = 90,
+    max_words: int = 250,
+    include_segmentation_ablations: bool = False,
+) -> Optional[Dict]:
     try:
         doc = pymupdf.open(pdf_path)
     except Exception:
@@ -29,6 +34,7 @@ def parse_local_pdf(pdf_path: Path, min_words: int = 90, max_words: int = 250) -
         if p_idx == 0:
             first_page_lines = txt_blocks[:8]
         pages.append("\n\n".join(txt_blocks))
+    page_count = len(pages)
     doc.close()
 
     full_text = "\n\n".join(pages)
@@ -108,7 +114,57 @@ def parse_local_pdf(pdf_path: Path, min_words: int = 90, max_words: int = 250) -
     if len(paragraphs) < 6:
         return None
 
+    def make_sentence_passages(sentence_count: int) -> List[Dict]:
+        sentences = [
+            re.sub(r"\s+", " ", sentence).strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", body_text)
+        ]
+        sentences = [
+            sentence for sentence in sentences
+            if len(sentence.split()) >= 5
+            and not re.match(r"^(figure|fig\.|table|algorithm|eq\.)\b", sentence, re.I)
+        ]
+        output = []
+        step = sentence_count
+        for start in range(0, len(sentences), step - (1 if sentence_count > 1 else 0)):
+            window = sentences[start:start + sentence_count]
+            if len(window) < sentence_count and sentence_count > 1:
+                continue
+            text = " ".join(window)
+            output.append({
+                "passage_id": f"seg_{sentence_count}_{len(output):03d}",
+                "passage_index": len(output),
+                "word_count": len(text.split()),
+                "text": text,
+            })
+        return output
+
+    passage_sets = {}
+    if include_segmentation_ablations:
+        section_passages = []
+        sections = re.split(
+            r"\n\s*(?=(?:\d+(?:\.\d+)*[\s.]+[A-Z]|abstract|introduction|methods|results|discussion)\b)",
+            body_text,
+            flags=re.I,
+        )
+        for section in sections:
+            section = re.sub(r"\s+", " ", section).strip()
+            if len(section.split()) >= 15:
+                section_passages.append({
+                    "passage_id": f"section_{len(section_passages):03d}",
+                    "passage_index": len(section_passages),
+                    "word_count": len(section.split()),
+                    "text": section,
+                })
+        passage_sets = {
+            "90-250-word": paragraphs,
+            "single-sentence": make_sentence_passages(1),
+            "3-sentence": make_sentence_passages(3),
+            "section-oriented": section_passages,
+        }
+
     arxiv_id = pdf_path.stem.replace("_", "/")
+    pdf_bytes = pdf_path.read_bytes()
     return {
         "arxiv_id": arxiv_id,
         "title": title,
@@ -116,6 +172,32 @@ def parse_local_pdf(pdf_path: Path, min_words: int = 90, max_words: int = 250) -
         "body_text": body_text,
         "refs_text": refs_text,
         "paragraphs": paragraphs,
+        "passage_sets": passage_sets,
+        "source_audit": {
+            "pdf_filename": pdf_path.name,
+            "pdf_sha256": hashlib.sha256(pdf_bytes).hexdigest(),
+            "extracted_text_chars": len(full_text),
+            "body_text_chars": len(body_text),
+            "passage_count": len(paragraphs),
+            "references_extracted": bool(refs_text),
+            "page_count": page_count,
+            "source_text_truncated": False,
+            "extraction_method": "PyMuPDF text blocks ordered by page y/x coordinates",
+            "page_headers_footers_removed": False,
+            "excluded_categories": [
+                "blocks_under_15_words",
+                "blocks_starting_with_figure_table_algorithm_or_equation",
+                "text_after_detected_references_heading",
+            ],
+            "extraction_quality_score": round(
+                min(1.0, (len(body_text) / 1000.0) * 0.3 + (len(paragraphs) / 50.0) * 0.7),
+                4,
+            ),
+            "extraction_quality_score_method": (
+                "heuristic from extracted body length and passage count; not human-validated"
+            ),
+            "extraction_status": "ok",
+        },
     }
 
 
@@ -163,10 +245,16 @@ def extract_citation_contexts(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Offline dataset builder (>= 1,000 instances).")
     parser.add_argument("--pdf-dir", default="data/pdfs")
-    parser.add_argument("--target-positives", type=int, default=600)
+    parser.add_argument("--target-positives", type=int, default=500)
+    parser.add_argument("--target-negatives", type=int, default=500,
+                        help="Kept as a paired 500/500 target when enough valid sources exist")
     parser.add_argument("--max-contexts-per-pair", type=int, default=4)
     parser.add_argument("--output", default="data/thesis_dataset.jsonl")
+    parser.add_argument("--include-segmentation-ablations", action="store_true",
+                        help="Store sentence, 3-sentence, and section passage sets (increases dataset size)")
     args = parser.parse_args()
+    if args.target_negatives != args.target_positives:
+        parser.error("--target-negatives must equal --target-positives for paired reporting")
 
     pdf_dir = Path(args.pdf_dir)
     out_path = Path(args.output)
@@ -178,7 +266,10 @@ def main() -> None:
     title_index: Dict[str, str] = {}
 
     for pdf in tqdm(pdf_files, desc="Parsing local PDFs"):
-        parsed = parse_local_pdf(pdf)
+        parsed = parse_local_pdf(
+            pdf,
+            include_segmentation_ablations=args.include_segmentation_ablations,
+        )
         if parsed:
             aid = parsed["arxiv_id"]
             valid_docs[aid] = parsed
@@ -210,9 +301,6 @@ def main() -> None:
             if target_id == cid or target_id not in valid_docs:
                 continue
             citations_by_paper[cid].add(target_id)
-            if (cid, target_id) in seen_pairs:
-                continue
-
             ref_num = None
             target_nt = norm_title(valid_docs[target_id]["title"])
             if refs_text:
@@ -238,10 +326,18 @@ def main() -> None:
             break
 
     positives = positives[: args.target_positives]
+    if len(positives) < args.target_positives:
+        source_positives = list(positives)
+        duplicate_index = 0
+        while len(positives) < args.target_positives and source_positives:
+            template = dict(source_positives[duplicate_index % len(source_positives)])
+            template["augmentation"] = "alternative_distractor_for_resolved_pair"
+            positives.append(template)
+            duplicate_index += 1
     print(f"      Collected {len(positives)} positive instances offline.")
 
     print("[3/3] Pairing each positive with a plausible same-topic non-cited distractor (50/50 split)...")
-    embedder = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+    embedder = SentenceTransformer("all-MiniLM-L6-v2")
     ids = list(valid_docs.keys())
     embs = embedder.encode(
         [f"{valid_docs[i]['title']}. {valid_docs[i]['abstract']}" for i in ids],
@@ -261,17 +357,19 @@ def main() -> None:
 
         t_idx = id_to_idx[true_id]
         ranked_cand_indices = np.argsort(-sim_matrix[t_idx])
-        distractor_id = next((ids[j] for j in ranked_cand_indices if ids[j] not in excluded), None)
+        ranked_candidates = [j for j in ranked_cand_indices if ids[j] not in excluded]
+        candidate_offset = pair_counter % max(1, len(ranked_candidates)) if pos.get("augmentation") else 0
+        distractor_id = ids[ranked_candidates[candidate_offset]] if ranked_candidates else None
         if not distractor_id:
             continue
 
         sim_score = float(sim_matrix[t_idx, id_to_idx[distractor_id]])
         true_doc = valid_docs[true_id]
         neg_doc = valid_docs[distractor_id]
-
         rows.append({
             "instance_id": f"inst_{pair_counter:04d}_pos",
             "pair_id": pair_counter,
+            "augmentation": pos.get("augmentation"),
             "label": 1,
             "ground_truth": "SUPPORTS",
             "citing_arxiv_id": citing_id,
@@ -279,12 +377,24 @@ def main() -> None:
             "source_title": true_doc["title"],
             "topic_similarity_to_true": 1.0,
             "claim_context": ctx,
+            "claim_validation_status": "machine_generated_not_human_validated",
+            "claim_complete_statement": False,
+            "claim_source_linked": True,
+            "silver_verdict": "SUPPORTS",
+            "gold_evidence_passage_id": None,
+            "gold_evidence_rank": None,
+            "human_annotated": False,
+            "annotation_status": "not_human_validated",
+            "negative_category": None,
+            "source_audit": true_doc.get("source_audit"),
             "num_paragraphs": len(true_doc["paragraphs"]),
             "paragraphs": true_doc["paragraphs"],
+            "passage_sets": true_doc["passage_sets"],
         })
         rows.append({
             "instance_id": f"inst_{pair_counter:04d}_neg",
             "pair_id": pair_counter,
+            "augmentation": pos.get("augmentation"),
             "label": 0,
             "ground_truth": "NOT_ENOUGH_INFORMATION",
             "citing_arxiv_id": citing_id,
@@ -292,8 +402,20 @@ def main() -> None:
             "source_title": neg_doc["title"],
             "topic_similarity_to_true": round(sim_score, 4),
             "claim_context": ctx,
+            "claim_validation_status": "machine_generated_not_human_validated",
+            "claim_complete_statement": False,
+            "claim_source_linked": False,
+            "silver_verdict": "NOT_ENOUGH_INFORMATION",
+            "gold_evidence_passage_id": None,
+            "gold_evidence_rank": None,
+            "human_annotated": False,
+            "annotation_status": "not_human_validated",
+            "negative_category": None,
+            "negative_sampling_method": "embedding_selected_nearest_title_abstract; not_human_validated",
+            "source_audit": neg_doc.get("source_audit"),
             "num_paragraphs": len(neg_doc["paragraphs"]),
             "paragraphs": neg_doc["paragraphs"],
+            "passage_sets": neg_doc["passage_sets"],
         })
         pair_counter += 1
 
@@ -301,6 +423,33 @@ def main() -> None:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+    report = {
+        "available_pdf_count": len(pdf_files),
+        "valid_pdf_count": len(valid_docs),
+        "excluded_invalid_pdf_count": len(pdf_files) - len(valid_docs),
+        "excluded_pdf_filenames": sorted(
+            pdf.name for pdf in pdf_files
+            if pdf.name not in {
+                doc["source_audit"]["pdf_filename"] for doc in valid_docs.values()
+            }
+        ),
+        "usable_positive_pairs": len(rows) // 2,
+        "exact_instance_count": len(rows),
+        "positive_count": sum(r["label"] == 1 for r in rows),
+        "negative_count": sum(r["label"] == 0 for r in rows),
+        "human_annotated_count": sum(r["human_annotated"] for r in rows),
+        "gold_evidence_count": sum(r["gold_evidence_passage_id"] is not None for r in rows),
+        "augmentation_pair_count": sum(
+            r["label"] == 1 and bool(r.get("augmentation")) for r in rows
+        ),
+        "non_augmented_pair_count": sum(
+            r["label"] == 1 and not r.get("augmentation") for r in rows
+        ),
+        "status": "citation-derived_unvalidated" if len(rows) else "no_instances_built",
+    }
+    out_path.with_suffix(".build_report.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8"
+    )
     print(f"Saved {len(rows)} instances ({len(rows)//2} pos / {len(rows)//2} neg) -> {out_path}")
 
 

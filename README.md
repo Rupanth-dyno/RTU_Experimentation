@@ -1,322 +1,164 @@
 # RTU Thesis Experimentation
 
-This project builds a local dataset from cached research-paper PDFs and evaluates
-whether passage-ranking methods help identify evidence for a citation claim.
-It compares three strategies:
+This project builds a local paper dataset and evaluates whether passage ranking
+helps retrieve evidence for citation claims. Strategies are an unranked
+baseline, BM25, and MiniLM dense ranking, followed by a local Qwen 2.5 3B
+verifier through Ollama.
 
-- **Unranked baseline:** checks paragraphs in their original document order.
-- **BM25:** ranks paragraphs using lexical relevance to the claim.
-- **MiniLM dense ranking:** ranks paragraphs using semantic embeddings from
-  `all-MiniLM-L6-v2`.
+The source-level decision task is **binary SUPPORTS versus
+NOT_ENOUGH_INFORMATION**. The per-passage verifier uses structured
+`SUPPORTS`/`REFUTES`/`NOT_ENOUGH_INFORMATION` labels; REFUTES and
+NOT_ENOUGH_INFORMATION both map to a negative source-level decision because
+the dataset has no human-validated refuting-source class. Invalid, partial,
+contradictory, or extra-key responses are retained as parse failures along
+with their raw response.
 
-The verifier checks ranked passages until it finds a `SUPPORTS` verdict or
-reaches the configured passage limit. If no passage supports the claim, it
-predicts `NOT_ENOUGH_INFORMATION`. This is a retrieval-and-verification
-experiment; it does not train or fine-tune an LLM.
+## Dataset and limitations
 
-The source-level classification task is binary: `SUPPORTS` versus
-`NOT_ENOUGH_INFORMATION`. The passage verifier may return `REFUTES`, but
-because the dataset has no refuting-source class, both `REFUTES` and
-`NOT_ENOUGH_INFORMATION` map to the negative source-level prediction. The
-labels are automatically constructed silver labels, not human-annotated gold
-labels; they must not be described as proof that a citation is factually
-supported.
-
-## Data pipeline
-
-`scripts/build_dataset.py` works from locally cached PDFs in `data/pdfs/`.
-PDF files are intentionally excluded from Git; their local filenames and
-contents are left unchanged. Place the source PDFs in that directory before
-building the dataset:
-
-1. Extracts titles, abstracts, body text, references, and paragraphs locally
-   using PyMuPDF.
-2. Finds internal citations using arXiv IDs and normalized paper titles.
-3. Extracts claim context around matched citations.
-4. Pairs positive cited sources with semantically similar non-cited
-   distractors using `all-MiniLM-L6-v2`.
-5. Writes positive (`SUPPORTS`) and negative
-   (`NOT_ENOUGH_INFORMATION`) instances as JSON Lines.
-
-The committed dataset, `data/thesis_dataset.jsonl`, contains **800 instances**:
-400 positive and 400 negative. The builder's default target is 600 positive
-instances, but the final dataset contains only pairs successfully found and
-processed from the available PDFs.
-
-Build the dataset with:
+Build the JSONL dataset from PDFs in `data/pdfs/`:
 
 ```bash
-.venv/bin/python scripts/build_dataset.py \
+python3 scripts/build_dataset.py \
   --pdf-dir data/pdfs \
-  --target-positives 600 \
+  --target-positives 500 \
   --output data/thesis_dataset.jsonl
 ```
 
-The builder runs its PDF extraction and embedding model in offline mode. The
-`all-MiniLM-L6-v2` model must already be available in the local Hugging Face
-cache.
+The builder creates 500 positive and 500 negative rows (1,000 total), but
+these are **silver labels**, not human gold judgments. Citation-derived
+positives do not prove support; embedding-selected negatives do not prove
+irrelevance. The current build is based on 2,495 available linked PDFs; 2,493
+were valid and two excluded. The build report lists exclusions and source
+audits. The 500 `pair_id`s include 100 explicitly marked alternative-distractor
+augmentations; there are 400 initially resolved citing/source claim pairs.
+Therefore, 1,000 rows must not be described as 1,000 independent observations.
+The generated dataset and annotation CSV include passages extracted from
+research papers, so they remain local and are not included in the public push.
+The Git-tracked 800-row dataset from the previous protocol is not the same
+artifact as the current local 1,000-row build.
 
-## LLM verifier
+PDF block ordering and extraction are heuristic. The audit fields record PDF
+filename/hash, extracted text size, page/passage counts, and other construction
+details, but do not establish that all PDF content was recovered. Current
+passages use the 90–250-word segmentation. To store optional sentence,
+three-sentence, and section-oriented segmentation ablations, build with
+`--include-segmentation-ablations`; this increases dataset size. PDF blocks
+are sorted by y/x coordinates, blocks under 15 words and
+blocks beginning with selected figure/table/algorithm/equation markers are
+filtered, and references are removed only when a heading is detected. There is
+no explicit header/footer removal or two-column layout model; table fragments,
+captions, equations, and incomplete sentences may remain. The recorded
+extraction score is a length/passage-count heuristic, not a human-validated
+quality measure.
 
-The experiment uses **Qwen 2.5 3B (`qwen2.5:3b`) served locally by Ollama**.
-The recorded pilot used Ollama at `http://localhost:11434`; no OpenAI service,
-API key, or cloud LLM is required. The updated experiment script calls Ollama's
-native `/api/chat` endpoint with JSON-schema-constrained output and requests
-one of three labels:
+`pair_id` connects the positive and negative instance for one paired candidate.
+Rows can also share citing papers, sources, or claim contexts across pair IDs.
+Statistical grouping therefore uses connected components over `pair_id`,
+`citing_arxiv_id`, and `source_arxiv_id`. Do not treat individual rows or
+processing batches as independent statistical units.
 
-- `SUPPORTS`
-- `REFUTES`
-- `NOT_ENOUGH_INFORMATION`
-
-Only `SUPPORTS` changes the experiment's source-level prediction to positive;
-both other verdicts result in `NOT_ENOUGH_INFORMATION`. The final task is
-therefore binary, not three-class. Updated verdicts are stored in a local
-SQLite cache keyed by model digest, Ollama version, prompt/schema/parser
-versions, inference options, claim, and passage. The legacy JSONL cache and
-historical results are retained for audit but are not used by fresh runs.
-
-Install the Python dependencies and download the Ollama model before running:
+The generated dataset contains no human gold verdict or gold evidence
+passages. `found_at_rank` is the verifier's predicted-support rank, not a gold
+evidence rank. Consequently, gold Recall@K/MRR and human inter-annotator
+agreement are unavailable until annotation is completed. Create an annotation
+template for 150 pairs (300 claim/source instances) with two annotator fields
+and candidate evidence passages:
 
 ```bash
-.venv/bin/python -m pip install -r requirements.txt
+python3 scripts/human_annotations.py --mode template --sample-pairs 150
+```
+
+Annotators should independently label `SUPPORTS`, `REFUTES`, or
+`NOT_ENOUGH_INFORMATION`, identify exact supporting passage IDs for SUPPORTS,
+and categorize negative sources as clearly unrelated, semantically similar,
+shared terminology, same experiment/different conditions, contradictory, same
+topic/insufficient evidence, or other. After both annotators complete the
+template, calculate agreement with:
+
+```bash
+python3 scripts/human_annotations.py --mode analyze
+```
+
+No human labels, evidence gold, or inter-annotator agreement are currently
+available. Do not report the template or automatic silver labels as completed
+annotation.
+
+## Grouped split and experiment protocol
+
+Create a deterministic, dataset-hash-bound split manifest:
+
+```bash
+python3 scripts/prepare_splits.py \
+  --dataset data/thesis_dataset.jsonl \
+  --seed 231104 \
+  --output results/splits_connected.json
+```
+
+Run a fresh evaluation with one fixed passage budget:
+
+```bash
+python3 scripts/run_experiments.py \
+  --dataset data/thesis_dataset.jsonl \
+  --split-manifest results/splits_connected.json --split development \
+  --max-checks 3 --fresh-run --strategy-seed 231104 \
+  --results-dir results/development_k3
+```
+
+`--max-checks 0` checks all passages. Use `scripts/run_budget_suite.py` for
+separate fresh runs at K=1,3,5,10,20. The split manifest must be regenerated
+whenever dataset bytes change. Use only development data to choose the primary
+budget; reserve test for one final run. Earlier full-data K=1 runs used the
+same examples later assigned to test and are exploratory, not held-out results.
+Their original dataset hash and verifier configuration were not recorded, so
+they do not validate the current 3-label structured-output implementation.
+
+Outputs include per-instance logs, confusion matrices, support
+precision/recall/F1, row-level Wilson intervals, connected-group bootstrap
+intervals, paired connected-group bootstrap confidence intervals and
+sign-flip tests, verifier/cache diagnostics, ranking time, and model-miss
+latency. Cache hits have zero model latency. The runner reports
+human gold evidence metrics only when gold passages exist. Whole-process
+wall-clock must be measured from a fresh run, not reconstructed from cached
+per-call latency.
+
+`scripts/evaluate_cached_budgets.py` reconstructs predictions from an
+exhaustive run and is **post hoc**, not an independent K-passage experiment.
+`scripts/analyze_existing_results.py` recalculates grouped statistics from
+completed logs but cannot recover unavailable wall-clock, gold, or human
+annotation data.
+
+Earlier pilot and full-run results used an older dataset/version and automatic
+silver labels. They are exploratory only, not confirmatory held-out results
+for the current dataset. Current conclusions remain inconclusive until the
+human validation and gold evidence set are completed.
+
+## Model setup
+
+Install dependencies and retrieve the model:
+
+```bash
+python3 -m pip install -r requirements.txt
 ollama pull qwen2.5:3b
 ollama serve
 ```
 
-If Ollama is listening on a different host, set `OLLAMA_HOST` or pass
-`--ollama-url`. The server URL may include a scheme and port, for example
-`http://localhost:11434`.
+The runner defaults to `http://localhost:11434`; use `--ollama-url` or
+`OLLAMA_HOST` to select another endpoint.
 
-## Running experiments
+## Main files
 
-Run the same 50-instance pilot, with at most five checked passages per source:
-
-```bash
-.venv/bin/python scripts/run_experiments.py \
-  --dataset data/thesis_dataset.jsonl \
-  --limit 50 \
-  --max-checks 5 \
-  --ollama-url http://localhost:11434 \
-  --model qwen2.5:3b \
-  --results-dir results_pilot
-```
-
-To evaluate the full dataset, omit `--limit` or set it to `0`. A
-`--max-checks` value of `0` checks all paragraphs. Full evaluation can make
-many local model requests and take substantially longer than the pilot.
-
-For long full-dataset runs, use restartable 75-instance batches instead:
-
-```bash
-.venv/bin/python scripts/run_experiment_batches.py \
-  --batch-size 75 \
-  --max-checks 0 \
-  --model qwen2.5:3b \
-  --ollama-url http://localhost:11434
-```
-
-Each completed historical batch is saved under `results/batches/` and skipped on restart.
-The 800-row dataset runs as 11 batches at this size.
-If Ollama fails during a batch, restart the same command with
-`--start-index` set to the beginning row of the failed batch; the verifier
-cache avoids repeating successful passage checks. The batch runner checks that
-Ollama is responding and that the requested model is installed before starting.
-Each request has a 120-second timeout by default; adjust it with
-`--request-timeout` if needed. After all batches complete, combine them into
-the full-dataset reports with:
-
-```bash
-.venv/bin/python scripts/merge_experiment_batches.py
-```
-
-To compare retrieval at fixed passage limits using ranks and verdicts from the
-completed full run (without making additional Ollama calls), run:
-
-```bash
-.venv/bin/python scripts/evaluate_cached_budgets.py \
-  --dataset data/thesis_dataset.jsonl \
-  --detailed-logs results/detailed_logs.json \
-  --budgets 1,3,5,10,20,30,50,0 \
-  --output-dir results/budget_eval
-```
-
-Here, budget `0` means all passages. The report includes precision and false
-positive/negative counts. These are exploratory fixed-budget results derived
-from the completed full run; they do not represent a new verifier or an
-independent test set.
-
-Each run writes:
-
-- `summary_metrics.json`: aggregate metrics for the three strategies.
-- `summary_metrics.txt`: the same summary in readable text form.
-- `detailed_logs.json`: per-instance predictions, correctness, checks, and
-  elapsed times.
-
-The historical pilot outputs are in `results_pilot/`. The earlier exhaustive
-results in `results/` were run on the complete dataset without a held-out
-grouped split and are exploratory, not confirmatory. Historical cached
-latencies are not fresh wall-clock measurements.
-`results/legacy_exploratory_reanalysis/` adds confusion matrices, clustered
-confidence intervals, group-level paired tests, and explicit limitations.
-
-## Confirmatory grouped evaluation
-
-Prepare a deterministic split that keeps every pair, citing paper, and source
-paper in one connected component and prevents components from crossing splits:
-
-```bash
-.venv/bin/python scripts/prepare_splits.py \
-  --dataset data/thesis_dataset.jsonl \
-  --seed 231104 \
-  --output results/splits.json
-```
-
-The split is approximately 60/20/20 for train/development/test; whole connected
-components mean exact percentages are not guaranteed. The script records the
-dataset hash and actual row counts. Use development data to choose the primary
-passage budget, then freeze it before examining test results.
-
-Run actual fresh test-set budget experiments, with cache reads bypassed, using
-the fixed budget curve:
-
-```bash
-.venv/bin/python scripts/run_budget_suite.py \
-  --dataset data/thesis_dataset.jsonl \
-  --split-manifest results/splits.json \
-  --split test \
-  --budgets 1,3,5,10,20 \
-  --model qwen2.5:3b \
-  --ollama-url http://localhost:11434
-```
-
-The test budget curve is descriptive; do not use it to choose the primary
-budget. Each run records model digest, Ollama version, prompt/schema/parser
-version, fresh wall time, and cache misses. Results include confusion matrices,
-precision/recall/F1, Wilson and connected-group bootstrap intervals, and
-paired connected-group permutation tests. The experiment is reproducible with
-the same dataset hash, split manifest, model digest, and settings.
-
-For timing repeatability, run the development split three times in separate
-result directories, varying `--strategy-seed` (for example 231104, 231105,
-231106). Each invocation uses a fresh cache namespace and randomizes strategy
-execution order. Freeze the primary budget from development results, then run
-the test split once. Report timing variation from development; do not rerun
-the test set to choose a method or budget.
-
-Repeated-call verifier agreement is measured on a deterministic sample from
-the test split. It measures repeatability, not correctness:
-
-```bash
-.venv/bin/python scripts/evaluate_verifier_agreement.py \
-  --dataset data/thesis_dataset.jsonl \
-  --split-manifest results/splits.json \
-  --split test \
-  --sample-size 100
-```
-
-`EXPERIMENT_PROTOCOL.md` specifies the split, hypothesis, metrics, and
-interpretation limits. `scripts/analyze_existing_results.py` reanalyses saved
-historical logs but explicitly marks them as exploratory and their timings as
-non-fresh.
-
-## Recorded pilot results
-
-The committed pilot evaluated the first **50 instances** from the dataset,
-checking up to **five passages** per instance:
-
-| Strategy | Accuracy | Positive-source accuracy | Recall@5 | LLM checks | Wall time |
-|---|---:|---:|---:|---:|---:|
-| Unranked baseline | 0.56 | 0.20 | 0.20 | 225 | 343.431 s |
-| BM25 ranked | 0.54 | 0.12 | 0.12 | 242 | 382.582 s |
-| MiniLM dense ranked | 0.52 | 0.12 | 0.12 | 239 | 379.442 s |
-
-On this pilot, both ranking approaches performed below the unranked baseline
-for overall accuracy, positive-source accuracy, and wall time. These results
-are specific to this sample, model, and five-passage limit; they should not be
-treated as full-dataset results.
-
-## Full-scale experiment
-
-The full-scale run evaluated all **800 instances** (400 positive and 400
-negative) with Qwen 2.5 3B through local Ollama. The run used restartable
-75-instance batches and `--max-checks 0` (check passages until support is found
-or the passages are exhausted). Batch outputs were merged into the full-run
-summary and per-instance logs.
-
-| Task | Work completed | Output |
-|---|---|---|
-| 1. Run the full dataset | Evaluated all 800 instances for the unranked, BM25, and MiniLM strategies | `results/batches/` |
-| 2. Merge batch results | Combined batch outputs into the aggregate metrics and detailed per-instance logs | `results/summary_metrics.json`, `results/summary_metrics.txt`, `results/detailed_logs.json` |
-| 3. Compare retrieval budgets | Derived predictions for limits of 1, 3, 5, 10, 20, 30, and 50 passages, plus all passages, using recorded full-run ranks; no additional Ollama calls | `results/budget_eval/` |
-
-### Full-scale results
-
-The legacy table's `Recall@5` and `MRR` are based on the verifier's first
-SUPPORTS response, not on human-annotated gold evidence ranks. They are not
-retrieval Recall@K/MRR and should not be interpreted as gold retrieval metrics.
-
-| Strategy | Accuracy | Positive-source accuracy | Negative-distractor accuracy | Recall@5 | MRR | LLM checks | Avg. checks/instance | Wall time |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Unranked baseline | 60.00% | 35.75% | 84.25% | 24.25% | 0.1833 | 31,796 | 39.74 | 13h 42m 57s |
-| BM25 ranked | 60.00% | 35.75% | 84.25% | 21.50% | 0.1507 | 31,198 | 39.00 | 13h 30m 51s |
-| MiniLM dense ranked | 60.00% | 35.75% | 84.25% | 22.25% | 0.1523 | 31,204 | 39.01 | 13h 32m 01s |
-
-All three strategies produced the same final predictions when allowed to
-exhaust the passages. In this historical run, ranking did not improve final
-accuracy. The recorded BM25 and MiniLM timing differences are not evidence of
-fresh wall-time savings because the old cache reused stored model latencies.
-The grouped reanalysis is in `results/legacy_exploratory_reanalysis/`; these
-full-dataset results remain exploratory.
-
-### Fixed-budget results
-
-These are exploratory operating points reconstructed from the full-run
-`found_at_rank` values. At each budget, a prediction is positive only if the
-recorded support rank falls within that limit; otherwise it is negative. The
-`all` rows reproduce the exhaustive full-scale results. This is not a new
-verifier run or an independent test set.
-
-| Budget | Strategy | Accuracy | Positive-source accuracy | Negative-distractor accuracy | Positive precision | FP | FN | Checks |
-|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | Unranked baseline | 53.50% | 13.25% | 93.75% | 67.95% | 25 | 347 | 800 |
-| 1 | BM25 ranked | 54.13% | 9.75% | 98.50% | 86.67% | 6 | 361 | 800 |
-| 1 | MiniLM dense ranked | 53.12% | 8.50% | 97.75% | 79.07% | 9 | 366 | 800 |
-| 3 | Unranked baseline | 56.37% | 21.25% | 91.50% | 71.43% | 34 | 315 | 2,217 |
-| 3 | BM25 ranked | 56.13% | 16.75% | 95.50% | 78.82% | 18 | 333 | 2,289 |
-| 3 | MiniLM dense ranked | 56.50% | 19.50% | 93.50% | 75.00% | 26 | 322 | 2,277 |
-| 5 | Unranked baseline | 57.50% | 24.25% | 90.75% | 72.39% | 37 | 303 | 3,573 |
-| 5 | BM25 ranked | 57.75% | 21.50% | 94.00% | 78.18% | 24 | 314 | 3,705 |
-| 5 | MiniLM dense ranked | 57.63% | 22.25% | 93.00% | 76.07% | 28 | 311 | 3,661 |
-| 10 | Unranked baseline | 58.50% | 27.00% | 90.00% | 72.97% | 40 | 292 | 6,864 |
-| 10 | BM25 ranked | 59.00% | 26.75% | 91.25% | 75.35% | 35 | 293 | 7,090 |
-| 10 | MiniLM dense ranked | 59.75% | 29.25% | 90.25% | 75.00% | 39 | 283 | 6,995 |
-| 20 | Unranked baseline | 60.12% | 31.50% | 88.75% | 73.68% | 45 | 274 | 13,157 |
-| 20 | BM25 ranked | 60.25% | 32.50% | 88.00% | 73.03% | 48 | 270 | 13,382 |
-| 20 | MiniLM dense ranked | 60.00% | 32.75% | 87.25% | 71.98% | 51 | 269 | 13,181 |
-| 30 | Unranked baseline | 59.38% | 32.50% | 86.25% | 70.27% | 55 | 270 | 18,597 |
-| 30 | BM25 ranked | 60.50% | 34.75% | 86.25% | 71.65% | 55 | 261 | 18,745 |
-| 30 | MiniLM dense ranked | 60.50% | 34.75% | 86.25% | 71.65% | 55 | 261 | 18,527 |
-| 50 | Unranked baseline | 59.38% | 34.00% | 84.75% | 69.04% | 61 | 264 | 23,414 |
-| 50 | BM25 ranked | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 23,318 |
-| 50 | MiniLM dense ranked | 60.38% | 35.50% | 85.25% | 70.65% | 59 | 258 | 23,154 |
-| All | Unranked baseline | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 31,796 |
-| All | BM25 ranked | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 31,198 |
-| All | MiniLM dense ranked | 60.00% | 35.75% | 84.25% | 69.42% | 63 | 257 | 31,204 |
-
-At 30 passages, BM25 and MiniLM have the highest overall accuracy (60.50%),
-but positive-source accuracy (34.75%) remains below the exhaustive result
-(35.75%). The budget curve shows a tradeoff between recovering positive
-sources and rejecting negative distractors; these results alone do not
-establish a general accuracy improvement.
-
-## Repository contents
-
-- `data/pdfs/`: locally cached source PDFs; excluded from Git.
-- `data/pdf links.txt`: filename list with arXiv abstract and direct PDF links.
 - `data/thesis_dataset.jsonl`: generated evaluation instances.
-- `scripts/build_dataset.py`: local PDF and citation dataset builder.
-- `scripts/run_experiments.py`: BM25, MiniLM, and Ollama evaluation.
-- `logs/llm_verification_cache.jsonl`: cached local verifier responses.
-- `results_pilot/`: pilot aggregate metrics, detailed logs, and text summary.
-- `results/batches/`: restartable full-dataset batch outputs before merging.
-- `results/budget_eval/`: fixed-budget evaluation using cached verifier judgments.
+- `data/thesis_dataset.build_report.json`: PDF and dataset construction counts.
+- `scripts/build_dataset.py`: PDF extraction and dataset builder.
+- `scripts/download_pdfs.py`: resumable PDF downloader and validation report.
+- `scripts/run_experiments.py`: ranking and verifier evaluation.
+- `scripts/experiment_utils.py`: connected groups, grouped splits, bootstrap,
+  and paired tests.
+- `scripts/prepare_splits.py`: dataset-hash-bound split manifest generator.
+- `scripts/human_annotations.py`: annotation template and agreement analysis.
+- `scripts/analyze_existing_results.py`: grouped reanalysis of completed logs.
+- `tests/`: focused verifier-parser and grouped-statistics tests.
+- `results/fresh_k1_no_batches/`: earlier exploratory full-dataset K=1 runs,
+  not held out and not human-gold evaluation.
+
+PDFs under `data/pdfs/` are local and excluded from Git.

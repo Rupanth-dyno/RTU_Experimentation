@@ -1,0 +1,20 @@
+POST-HOC GROUPED REANALYSIS
+Silver-label diagnostics only; not human-gold or held-out test results.
+Dataset SHA-256: 02b92a4d75f83e8c3571a03fd1c7af8056b21f16e094de91a4def50b2d9555cb
+Detailed-log SHA-256: af40cb973c4f8b9b6a6c1ec9810538c41fc070df12ea1cd96eed2d065800ee90
+Original run dataset hash was not captured; IDs and labels were validated.
+Original verifier configuration was not recorded; this is not a current-verifier result.
+
+Strategy | N | Accuracy [connected-group 95% CI] | Support P/R/F1 | TP/FP/TN/FN
+Unranked_Baseline | 1000 | 0.557 [0.520, 0.601] | 0.699/0.200/0.311 | 100/43/457/400
+BM25_Ranked | 1000 | 0.546 [0.526, 0.578] | 0.761/0.134/0.228 | 67/21/479/433
+MiniLM_Dense_Ranked | 1000 | 0.531 [0.508, 0.553] | 0.687/0.114/0.196 | 57/26/474/443
+
+PAIRED CONNECTED-GROUP COMPARISONS
+Unranked_Baseline__vs__BM25_Ranked: accuracy difference=0.011, 95% CI=[-0.0282, 0.0456], two-sided p=0.612819
+Unranked_Baseline__vs__MiniLM_Dense_Ranked: accuracy difference=0.026, 95% CI=[-0.0135, 0.0779], two-sided p=0.239588
+BM25_Ranked__vs__MiniLM_Dense_Ranked: accuracy difference=0.015, 95% CI=[-0.0101, 0.057], two-sided p=0.381081
+
+No comparison is statistically significant at alpha=0.05.
+Gold evidence Recall@K/MRR and human inter-annotator agreement are unavailable.
+Per-instance historical logs cannot recover whole-process wall-clock time.

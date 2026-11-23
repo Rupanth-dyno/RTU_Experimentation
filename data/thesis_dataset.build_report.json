@@ -1,0 +1,18 @@
+{
+  "available_pdf_count": 2495,
+  "valid_pdf_count": 2493,
+  "excluded_invalid_pdf_count": 2,
+  "excluded_pdf_filenames": [
+    "2610.35609.pdf",
+    "2611.11349.pdf"
+  ],
+  "usable_positive_pairs": 500,
+  "exact_instance_count": 1000,
+  "positive_count": 500,
+  "negative_count": 500,
+  "human_annotated_count": 0,
+  "gold_evidence_count": 0,
+  "augmentation_pair_count": 100,
+  "non_augmented_pair_count": 400,
+  "status": "citation-derived_unvalidated"
+}

@@ -1,0 +1,47 @@
+{
+  "Unranked_Baseline__vs__BM25_Ranked": {
+    "groups": 56,
+    "paired_accuracy_difference": 0.011,
+    "two_sided_p_value": 0.612819,
+    "permutations": 20000,
+    "method": "paired_sign_flip_permutation_over_connected_components",
+    "paired_accuracy_difference_95_ci": [
+      -0.0282,
+      0.0456
+    ],
+    "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+    "independent_group_count": 56,
+    "bootstrap_repetitions": 2000,
+    "bootstrap_seed": 231104
+  },
+  "Unranked_Baseline__vs__MiniLM_Dense_Ranked": {
+    "groups": 56,
+    "paired_accuracy_difference": 0.026,
+    "two_sided_p_value": 0.239588,
+    "permutations": 20000,
+    "method": "paired_sign_flip_permutation_over_connected_components",
+    "paired_accuracy_difference_95_ci": [
+      -0.0135,
+      0.0779
+    ],
+    "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+    "independent_group_count": 56,
+    "bootstrap_repetitions": 2000,
+    "bootstrap_seed": 231104
+  },
+  "BM25_Ranked__vs__MiniLM_Dense_Ranked": {
+    "groups": 56,
+    "paired_accuracy_difference": 0.015,
+    "two_sided_p_value": 0.381081,
+    "permutations": 20000,
+    "method": "paired_sign_flip_permutation_over_connected_components",
+    "paired_accuracy_difference_95_ci": [
+      -0.0101,
+      0.057
+    ],
+    "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+    "independent_group_count": 56,
+    "bootstrap_repetitions": 2000,
+    "bootstrap_seed": 231104
+  }
+}

@@ -1,0 +1,286 @@
+{
+  "analysis_type": "post-hoc grouped reanalysis of completed evaluation logs",
+  "dataset": "data/thesis_dataset.jsonl",
+  "dataset_sha256": "02b92a4d75f83e8c3571a03fd1c7af8056b21f16e094de91a4def50b2d9555cb",
+  "detailed_logs": "results/fresh_k1_no_batches/detailed_logs.json",
+  "detailed_logs_sha256": "af40cb973c4f8b9b6a6c1ec9810538c41fc070df12ea1cd96eed2d065800ee90",
+  "seed": 231104,
+  "original_run_dataset_hash": "not captured in the historical log set; instance IDs and labels were validated against the supplied dataset",
+  "metrics": {
+    "Unranked_Baseline": {
+      "strategy": "Unranked_Baseline",
+      "instances_evaluated": 1000,
+      "connected_independent_groups": 56,
+      "label_source": "automatic citation/distractor silver labels; not human gold",
+      "confusion_matrix": {
+        "labels": [
+          "NOT_ENOUGH_INFORMATION",
+          "SUPPORTS"
+        ],
+        "rows_true_columns_predicted": [
+          [
+            457,
+            43
+          ],
+          [
+            400,
+            100
+          ]
+        ]
+      },
+      "true_positive": 100,
+      "false_positive": 43,
+      "true_negative": 457,
+      "false_negative": 400,
+      "accuracy": 0.557,
+      "accuracy_row_level_wilson_95_ci": [
+        0.5260523439907523,
+        0.5875114055418946
+      ],
+      "support_precision": 0.6993006993006993,
+      "support_recall": 0.2,
+      "support_f1": 0.3110419906687403,
+      "negative_accuracy": 0.914,
+      "first_pass_support_accuracy": 0.2,
+      "median_checks": 1.0,
+      "p95_checks": 1.0,
+      "median_model_or_verifier_latency_per_instance_sec": 0.77227,
+      "p95_model_or_verifier_latency_per_instance_sec": 1.1559,
+      "median_ranking_sec_per_instance": 0.0,
+      "p95_ranking_sec_per_instance": 0.0,
+      "median_recorded_pipeline_sec_per_instance": 0.77227,
+      "p95_recorded_pipeline_sec_per_instance": 1.1559,
+      "total_recorded_model_sec": 802.83216,
+      "total_recorded_ranking_sec": 0.0,
+      "cache_hits": 0,
+      "cache_misses": 1000,
+      "cache_hit_rate": 0.0,
+      "gold_evidence_metrics": "unavailable: no human gold evidence passages",
+      "human_inter_annotator_agreement": "unavailable: no human annotations",
+      "whole_process_wall_clock": "not recoverable from historical per-instance logs",
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "independent_group_count": 56,
+      "bootstrap_repetitions": 2000,
+      "seed": 231104,
+      "accuracy_95_ci": [
+        0.5199,
+        0.601
+      ],
+      "precision_95_ci": [
+        0.5794,
+        0.8088
+      ],
+      "positive_recall_95_ci": [
+        0.1355,
+        0.2802
+      ],
+      "support_f1_95_ci": [
+        0.2203,
+        0.4103
+      ],
+      "negative_recall_95_ci": [
+        0.8838,
+        0.9456
+      ]
+    },
+    "BM25_Ranked": {
+      "strategy": "BM25_Ranked",
+      "instances_evaluated": 1000,
+      "connected_independent_groups": 56,
+      "label_source": "automatic citation/distractor silver labels; not human gold",
+      "confusion_matrix": {
+        "labels": [
+          "NOT_ENOUGH_INFORMATION",
+          "SUPPORTS"
+        ],
+        "rows_true_columns_predicted": [
+          [
+            479,
+            21
+          ],
+          [
+            433,
+            67
+          ]
+        ]
+      },
+      "true_positive": 67,
+      "false_positive": 21,
+      "true_negative": 479,
+      "false_negative": 433,
+      "accuracy": 0.546,
+      "accuracy_row_level_wilson_95_ci": [
+        0.5150242420441904,
+        0.5766236961751385
+      ],
+      "support_precision": 0.7613636363636364,
+      "support_recall": 0.134,
+      "support_f1": 0.22789115646258504,
+      "negative_accuracy": 0.958,
+      "first_pass_support_accuracy": 0.134,
+      "median_checks": 1.0,
+      "p95_checks": 1.0,
+      "median_model_or_verifier_latency_per_instance_sec": 0.66733,
+      "p95_model_or_verifier_latency_per_instance_sec": 1.0995,
+      "median_ranking_sec_per_instance": 0.00199,
+      "p95_ranking_sec_per_instance": 0.00622,
+      "median_recorded_pipeline_sec_per_instance": 0.6691,
+      "p95_recorded_pipeline_sec_per_instance": 1.1018,
+      "total_recorded_model_sec": 714.57955,
+      "total_recorded_ranking_sec": 2.5408,
+      "cache_hits": 0,
+      "cache_misses": 1000,
+      "cache_hit_rate": 0.0,
+      "gold_evidence_metrics": "unavailable: no human gold evidence passages",
+      "human_inter_annotator_agreement": "unavailable: no human annotations",
+      "whole_process_wall_clock": "not recoverable from historical per-instance logs",
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "independent_group_count": 56,
+      "bootstrap_repetitions": 2000,
+      "seed": 231104,
+      "accuracy_95_ci": [
+        0.5259,
+        0.5782
+      ],
+      "precision_95_ci": [
+        0.6703,
+        0.8687
+      ],
+      "positive_recall_95_ci": [
+        0.0964,
+        0.1977
+      ],
+      "support_f1_95_ci": [
+        0.1693,
+        0.3194
+      ],
+      "negative_recall_95_ci": [
+        0.941,
+        0.978
+      ]
+    },
+    "MiniLM_Dense_Ranked": {
+      "strategy": "MiniLM_Dense_Ranked",
+      "instances_evaluated": 1000,
+      "connected_independent_groups": 56,
+      "label_source": "automatic citation/distractor silver labels; not human gold",
+      "confusion_matrix": {
+        "labels": [
+          "NOT_ENOUGH_INFORMATION",
+          "SUPPORTS"
+        ],
+        "rows_true_columns_predicted": [
+          [
+            474,
+            26
+          ],
+          [
+            443,
+            57
+          ]
+        ]
+      },
+      "true_positive": 57,
+      "false_positive": 26,
+      "true_negative": 474,
+      "false_negative": 443,
+      "accuracy": 0.531,
+      "accuracy_row_level_wilson_95_ci": [
+        0.5000102483912816,
+        0.5617524925826141
+      ],
+      "support_precision": 0.6867469879518072,
+      "support_recall": 0.114,
+      "support_f1": 0.19554030874785594,
+      "negative_accuracy": 0.948,
+      "first_pass_support_accuracy": 0.114,
+      "median_checks": 1.0,
+      "p95_checks": 1.0,
+      "median_model_or_verifier_latency_per_instance_sec": 0.62005,
+      "p95_model_or_verifier_latency_per_instance_sec": 1.0179,
+      "median_ranking_sec_per_instance": 0.09224,
+      "p95_ranking_sec_per_instance": 0.29437,
+      "median_recorded_pipeline_sec_per_instance": 0.74117,
+      "p95_recorded_pipeline_sec_per_instance": 1.24171,
+      "total_recorded_model_sec": 672.68458,
+      "total_recorded_ranking_sec": 123.23682,
+      "cache_hits": 0,
+      "cache_misses": 1000,
+      "cache_hit_rate": 0.0,
+      "gold_evidence_metrics": "unavailable: no human gold evidence passages",
+      "human_inter_annotator_agreement": "unavailable: no human annotations",
+      "whole_process_wall_clock": "not recoverable from historical per-instance logs",
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "independent_group_count": 56,
+      "bootstrap_repetitions": 2000,
+      "seed": 231104,
+      "accuracy_95_ci": [
+        0.5078,
+        0.5528
+      ],
+      "precision_95_ci": [
+        0.5417,
+        0.8298
+      ],
+      "positive_recall_95_ci": [
+        0.0823,
+        0.1503
+      ],
+      "support_f1_95_ci": [
+        0.1472,
+        0.25
+      ],
+      "negative_recall_95_ci": [
+        0.8987,
+        0.9759
+      ]
+    }
+  },
+  "paired_cluster_tests": {
+    "Unranked_Baseline__vs__BM25_Ranked": {
+      "groups": 56,
+      "paired_accuracy_difference": 0.011,
+      "two_sided_p_value": 0.612819,
+      "permutations": 20000,
+      "method": "paired_sign_flip_permutation_over_connected_components",
+      "paired_accuracy_difference_95_ci": [
+        -0.0282,
+        0.0456
+      ],
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "independent_group_count": 56,
+      "bootstrap_repetitions": 2000,
+      "bootstrap_seed": 231104
+    },
+    "Unranked_Baseline__vs__MiniLM_Dense_Ranked": {
+      "groups": 56,
+      "paired_accuracy_difference": 0.026,
+      "two_sided_p_value": 0.239588,
+      "permutations": 20000,
+      "method": "paired_sign_flip_permutation_over_connected_components",
+      "paired_accuracy_difference_95_ci": [
+        -0.0135,
+        0.0779
+      ],
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "independent_group_count": 56,
+      "bootstrap_repetitions": 2000,
+      "bootstrap_seed": 231104
+    },
+    "BM25_Ranked__vs__MiniLM_Dense_Ranked": {
+      "groups": 56,
+      "paired_accuracy_difference": 0.015,
+      "two_sided_p_value": 0.381081,
+      "permutations": 20000,
+      "method": "paired_sign_flip_permutation_over_connected_components",
+      "paired_accuracy_difference_95_ci": [
+        -0.0101,
+        0.057
+      ],
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "independent_group_count": 56,
+      "bootstrap_repetitions": 2000,
+      "bootstrap_seed": 231104
+    }
+  }
+}

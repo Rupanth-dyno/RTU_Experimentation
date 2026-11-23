@@ -273,3 +273,46 @@ def paired_cluster_permutation(
         "two_sided_p_value": round(p_value, 6),
         "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups",
     }
+
+
+def paired_cluster_bootstrap_difference(
+    first_logs: Sequence[Dict],
+    second_logs: Sequence[Dict],
+    group_for_instance: Dict[str, str],
+    seed: int = 231104,
+    repetitions: int = 2000,
+) -> Dict:
+    second_by_id = {row["instance_id"]: row for row in second_logs}
+    if len(second_by_id) != len(second_logs):
+        raise ValueError("Duplicate instance IDs in second strategy logs")
+    first_ids = [row["instance_id"] for row in first_logs]
+    if len(set(first_ids)) != len(first_ids):
+        raise ValueError("Duplicate instance IDs in first strategy logs")
+    if set(first_ids) != set(second_by_id):
+        raise ValueError("Strategy logs do not contain the same instance IDs")
+
+    differences: Dict[str, List[int]] = defaultdict(list)
+    for first in first_logs:
+        second = second_by_id[first["instance_id"]]
+        group_id = group_for_instance.get(first["instance_id"], first["instance_id"])
+        differences[group_id].append(int(first["correct"]) - int(second["correct"]))
+    if not differences:
+        raise ValueError("Cannot bootstrap an empty paired evaluation")
+
+    clusters = list(differences.values())
+    rng = random.Random(seed)
+    estimates = []
+    for _ in range(repetitions):
+        sample = [rng.choice(clusters) for _ in clusters]
+        denominator = sum(len(cluster) for cluster in sample)
+        estimates.append(sum(sum(cluster) for cluster in sample) / denominator)
+    estimates.sort()
+    low = estimates[int(0.025 * (repetitions - 1))]
+    high = estimates[int(0.975 * (repetitions - 1))]
+    return {
+        "accuracy_difference_cluster_bootstrap_95_ci": [round(low, 4), round(high, 4)],
+        "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+        "bootstrap_groups": len(clusters),
+        "bootstrap_repetitions": repetitions,
+        "bootstrap_seed": seed,
+    }

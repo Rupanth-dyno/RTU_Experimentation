@@ -8,6 +8,7 @@ from scripts.run_experiments import CachedLLMVerifier, evaluate_strategy
 from scripts.experiment_utils import (
     connected_groups,
     make_grouped_split,
+    paired_cluster_bootstrap_difference,
     paired_cluster_permutation,
     summarize_metrics,
 )
@@ -97,6 +98,10 @@ class GroupedExperimentTests(unittest.TestCase):
         self.assertEqual(summary["p95_checks"], 2)
         paired = paired_cluster_permutation(logs, logs, {"p": "g1", "n": "g1"})
         self.assertEqual(paired["two_sided_p_value"], 1.0)
+        paired_ci = paired_cluster_bootstrap_difference(
+            logs, logs, {"p": "g1", "n": "g1"}, repetitions=100
+        )
+        self.assertEqual(paired_ci["accuracy_difference_cluster_bootstrap_95_ci"], [0.0, 0.0])
 
 
 class StructuredVerifierTests(unittest.TestCase):
@@ -119,11 +124,18 @@ class StructuredVerifierTests(unittest.TestCase):
                 verifier = CachedLLMVerifier(
                     "http://localhost:11434", "qwen2.5:3b", cache_path, 5
                 )
-                verdict, latency, cache_hit = verifier.verify("claim", "passage")
+                verdict, latency, cache_hit, raw_answer, parse_status = verifier.verify(
+                    "claim", "passage"
+                )
                 self.assertEqual(verdict, "SUPPORTS")
                 self.assertGreaterEqual(latency, 0)
                 self.assertFalse(cache_hit)
-                self.assertEqual(verifier.verify("claim", "passage"), ("SUPPORTS", 0.0, True))
+                self.assertEqual(raw_answer, '{"verdict":"SUPPORTS"}')
+                self.assertEqual(parse_status, "ok")
+                self.assertEqual(
+                    verifier.verify("claim", "passage"),
+                    ("SUPPORTS", 0.0, True, '{"verdict":"SUPPORTS"}', "ok"),
+                )
                 self.assertEqual(post.call_count, 1)
                 self.assertEqual(
                     post.call_args.kwargs["json"]["format"]["properties"]["verdict"]["enum"],
@@ -164,8 +176,10 @@ class StructuredVerifierTests(unittest.TestCase):
                     Path(directory) / "cache.sqlite3",
                     5,
                 )
-                with self.assertRaisesRegex(ValueError, "invalid JSON"):
-                    verifier.verify("claim", "passage")
+                result = verifier.verify("claim", "passage")
+                self.assertEqual(result[0], "PARSE_FAILURE")
+                self.assertEqual(result[3], "NOT SUPPORTS")
+                self.assertEqual(result[4], "parse_failure")
                 verifier.db.close()
 
 
@@ -175,7 +189,7 @@ class EvaluationLoggingTests(unittest.TestCase):
             config = {"model": "test"}
 
             def verify(self, claim, passage):
-                return "SUPPORTS", 0.125, False
+                return "SUPPORTS", 0.125, False, '{"verdict":"SUPPORTS"}', "ok"
 
         row = {
             "instance_id": "positive",
@@ -197,6 +211,10 @@ class EvaluationLoggingTests(unittest.TestCase):
         self.assertTrue(result["logs"][0]["correct"])
         self.assertEqual(result["logs"][0]["iterations_used"], 1)
         self.assertEqual(result["summary"]["true_positive"], 1)
+        self.assertEqual(
+            result["logs"][0]["passage_verifier_outputs"][0]["raw_answer"],
+            '{"verdict":"SUPPORTS"}',
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,279 @@
+{
+  "status": "post_hoc_exploratory_reanalysis_not_held_out_test",
+  "dataset": "data/thesis_dataset.jsonl",
+  "dataset_sha256": "02b92a4d75f83e8c3571a03fd1c7af8056b21f16e094de91a4def50b2d9555cb",
+  "detailed_logs": "results/fresh_k1_no_batches/detailed_logs.json",
+  "detailed_logs_sha256": "af40cb973c4f8b9b6a6c1ec9810538c41fc070df12ea1cd96eed2d065800ee90",
+  "historical_run_dataset_hash": "not captured; instance IDs and labels validated against supplied dataset",
+  "dataset_size": 1000,
+  "independent_connected_groups": 56,
+  "label_source": "automatic citation/distractor construction; weak silver labels, not human gold",
+  "latency_warning": "Per-call model latency is recorded, but whole-process wall-clock cannot be reconstructed.",
+  "verifier_agreement": "Not measurable from the saved logs.",
+  "results": [
+    {
+      "strategy": "Unranked_Baseline",
+      "instances_evaluated": 1000,
+      "independent_groups": 56,
+      "confusion_matrix": {
+        "labels": [
+          "NOT_ENOUGH_INFORMATION",
+          "SUPPORTS"
+        ],
+        "rows_true_columns_predicted": [
+          [
+            457,
+            43
+          ],
+          [
+            400,
+            100
+          ]
+        ]
+      },
+      "true_positive": 100,
+      "false_positive": 43,
+      "true_negative": 457,
+      "false_negative": 400,
+      "accuracy": 0.557,
+      "accuracy_naive_row_level_wilson_95_ci": [
+        0.5261,
+        0.5875
+      ],
+      "accuracy_cluster_bootstrap_95_ci": [
+        0.5199,
+        0.601
+      ],
+      "support_precision": 0.6993,
+      "support_precision_cluster_bootstrap_95_ci": [
+        0.5794,
+        0.8088
+      ],
+      "support_recall": 0.2,
+      "support_recall_cluster_bootstrap_95_ci": [
+        0.1355,
+        0.2802
+      ],
+      "support_f1": 0.311,
+      "support_f1_cluster_bootstrap_95_ci": [
+        0.2203,
+        0.4103
+      ],
+      "negative_accuracy": 0.914,
+      "negative_accuracy_cluster_bootstrap_95_ci": [
+        0.8838,
+        0.9456
+      ],
+      "first_pass_support_recall": 0.2,
+      "first_pass_support_accuracy_on_positives": 0.2,
+      "first_pass_support_precision": 0.6993,
+      "median_checks": 1,
+      "p95_checks": 1,
+      "mean_checks": 1.0,
+      "total_checks": 1000,
+      "cache_hits": null,
+      "cache_misses": null,
+      "ranking_sec": 0.0,
+      "model_api_sec": 802.832,
+      "sum_per_instance_recorded_elapsed_sec": 802.832,
+      "outcome_diagnostic_categories_not_gold_attributions": {
+        "positive_missed_within_budget": 400,
+        "support_verdict_on_negative_distractor": 43,
+        "correct_positive_decision": 100,
+        "correct_negative_decision": 457
+      },
+      "verifier_agreement": "Not measured; run scripts/evaluate_verifier_agreement.py"
+    },
+    {
+      "strategy": "BM25_Ranked",
+      "instances_evaluated": 1000,
+      "independent_groups": 56,
+      "confusion_matrix": {
+        "labels": [
+          "NOT_ENOUGH_INFORMATION",
+          "SUPPORTS"
+        ],
+        "rows_true_columns_predicted": [
+          [
+            479,
+            21
+          ],
+          [
+            433,
+            67
+          ]
+        ]
+      },
+      "true_positive": 67,
+      "false_positive": 21,
+      "true_negative": 479,
+      "false_negative": 433,
+      "accuracy": 0.546,
+      "accuracy_naive_row_level_wilson_95_ci": [
+        0.515,
+        0.5766
+      ],
+      "accuracy_cluster_bootstrap_95_ci": [
+        0.5259,
+        0.5782
+      ],
+      "support_precision": 0.7614,
+      "support_precision_cluster_bootstrap_95_ci": [
+        0.6703,
+        0.8687
+      ],
+      "support_recall": 0.134,
+      "support_recall_cluster_bootstrap_95_ci": [
+        0.0964,
+        0.1977
+      ],
+      "support_f1": 0.2279,
+      "support_f1_cluster_bootstrap_95_ci": [
+        0.1693,
+        0.3194
+      ],
+      "negative_accuracy": 0.958,
+      "negative_accuracy_cluster_bootstrap_95_ci": [
+        0.941,
+        0.978
+      ],
+      "first_pass_support_recall": 0.134,
+      "first_pass_support_accuracy_on_positives": 0.134,
+      "first_pass_support_precision": 0.7614,
+      "median_checks": 1,
+      "p95_checks": 1,
+      "mean_checks": 1.0,
+      "total_checks": 1000,
+      "cache_hits": null,
+      "cache_misses": null,
+      "ranking_sec": 2.541,
+      "model_api_sec": 714.58,
+      "sum_per_instance_recorded_elapsed_sec": 717.12,
+      "outcome_diagnostic_categories_not_gold_attributions": {
+        "positive_missed_within_budget": 433,
+        "support_verdict_on_negative_distractor": 21,
+        "correct_positive_decision": 67,
+        "correct_negative_decision": 479
+      },
+      "verifier_agreement": "Not measured; run scripts/evaluate_verifier_agreement.py"
+    },
+    {
+      "strategy": "MiniLM_Dense_Ranked",
+      "instances_evaluated": 1000,
+      "independent_groups": 56,
+      "confusion_matrix": {
+        "labels": [
+          "NOT_ENOUGH_INFORMATION",
+          "SUPPORTS"
+        ],
+        "rows_true_columns_predicted": [
+          [
+            474,
+            26
+          ],
+          [
+            443,
+            57
+          ]
+        ]
+      },
+      "true_positive": 57,
+      "false_positive": 26,
+      "true_negative": 474,
+      "false_negative": 443,
+      "accuracy": 0.531,
+      "accuracy_naive_row_level_wilson_95_ci": [
+        0.5,
+        0.5618
+      ],
+      "accuracy_cluster_bootstrap_95_ci": [
+        0.5078,
+        0.5528
+      ],
+      "support_precision": 0.6867,
+      "support_precision_cluster_bootstrap_95_ci": [
+        0.5417,
+        0.8298
+      ],
+      "support_recall": 0.114,
+      "support_recall_cluster_bootstrap_95_ci": [
+        0.0823,
+        0.1503
+      ],
+      "support_f1": 0.1955,
+      "support_f1_cluster_bootstrap_95_ci": [
+        0.1472,
+        0.25
+      ],
+      "negative_accuracy": 0.948,
+      "negative_accuracy_cluster_bootstrap_95_ci": [
+        0.8987,
+        0.9759
+      ],
+      "first_pass_support_recall": 0.114,
+      "first_pass_support_accuracy_on_positives": 0.114,
+      "first_pass_support_precision": 0.6867,
+      "median_checks": 1,
+      "p95_checks": 1,
+      "mean_checks": 1.0,
+      "total_checks": 1000,
+      "cache_hits": null,
+      "cache_misses": null,
+      "ranking_sec": 123.237,
+      "model_api_sec": 672.685,
+      "sum_per_instance_recorded_elapsed_sec": 795.922,
+      "outcome_diagnostic_categories_not_gold_attributions": {
+        "positive_missed_within_budget": 443,
+        "support_verdict_on_negative_distractor": 26,
+        "correct_positive_decision": 57,
+        "correct_negative_decision": 474
+      },
+      "verifier_agreement": "Not measured; run scripts/evaluate_verifier_agreement.py"
+    }
+  ],
+  "paired_cluster_tests": {
+    "Unranked_Baseline__vs__BM25_Ranked": {
+      "groups": 56,
+      "accuracy_difference": 0.011,
+      "two_sided_p_value": 0.612819,
+      "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups",
+      "accuracy_difference_cluster_bootstrap_95_ci": [
+        -0.0282,
+        0.0456
+      ],
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "bootstrap_groups": 56,
+      "bootstrap_repetitions": 2000,
+      "bootstrap_seed": 231104
+    },
+    "Unranked_Baseline__vs__MiniLM_Dense_Ranked": {
+      "groups": 56,
+      "accuracy_difference": 0.026,
+      "two_sided_p_value": 0.239588,
+      "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups",
+      "accuracy_difference_cluster_bootstrap_95_ci": [
+        -0.0135,
+        0.0779
+      ],
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "bootstrap_groups": 56,
+      "bootstrap_repetitions": 2000,
+      "bootstrap_seed": 231104
+    },
+    "BM25_Ranked__vs__MiniLM_Dense_Ranked": {
+      "groups": 56,
+      "accuracy_difference": 0.015,
+      "two_sided_p_value": 0.381081,
+      "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups",
+      "accuracy_difference_cluster_bootstrap_95_ci": [
+        -0.0101,
+        0.057
+      ],
+      "bootstrap_unit": "connected_component(pair_id,citing_arxiv_id,source_arxiv_id)",
+      "bootstrap_groups": 56,
+      "bootstrap_repetitions": 2000,
+      "bootstrap_seed": 231104
+    }
+  },
+  "interpretation": "The full-dataset K=1 logs are exploratory, not held-out. They cannot establish a ranking improvement or gold evidence retrieval. Confirmatory claims require human labels, gold evidence passages, and a predeclared grouped test protocol."
+}

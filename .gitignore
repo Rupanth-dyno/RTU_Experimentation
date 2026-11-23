@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 .DS_Store
 data/pdfs/
+data/human_validation_annotations.csv
+
 logs/verifier_cache/
 *.sqlite3
 *.sqlite3-shm

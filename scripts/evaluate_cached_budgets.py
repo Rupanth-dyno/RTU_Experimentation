@@ -112,6 +112,8 @@ def main() -> None:
         "dataset": args.dataset,
         "source_logs": args.detailed_logs,
         "derived_from_full_run_ranks": True,
+        "independent_experiment": False,
+        "status": "post_hoc_reconstruction_only",
         "budgets": budgets,
         "results": results,
     }

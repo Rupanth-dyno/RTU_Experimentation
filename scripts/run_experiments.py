@@ -19,19 +19,21 @@ from tqdm import tqdm
 try:
     from .experiment_utils import (
         connected_groups,
+        paired_cluster_bootstrap_difference,
         paired_cluster_permutation,
         summarize_metrics,
     )
 except ImportError:
     from experiment_utils import (
         connected_groups,
+        paired_cluster_bootstrap_difference,
         paired_cluster_permutation,
         summarize_metrics,
     )
 
 
-PROMPT_VERSION = "citation-verifier-json-v2"
-PARSER_VERSION = "exact-json-enum-v1"
+PROMPT_VERSION = "citation-verifier-json-v3"
+PARSER_VERSION = "exact-json-enum-v2"
 VERDICT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -44,10 +46,31 @@ VERDICT_SCHEMA = {
     "additionalProperties": False,
 }
 OLLAMA_OPTIONS = {"temperature": 0.0, "num_predict": 64}
+SEGMENTATIONS = ("90-250-word", "single-sentence", "3-sentence", "section-oriented")
 
 
 def tokenize(text: str) -> List[str]:
     return re.findall(r"\b\w+\b", text.lower())
+
+
+def parse_verifier_json(raw_answer: str) -> Tuple[str, str]:
+    try:
+        def reject_duplicate_keys(pairs: List[Tuple[str, object]]) -> Dict:
+            parsed = {}
+            for key, value in pairs:
+                if key in parsed:
+                    raise ValueError(f"duplicate JSON key: {key}")
+                parsed[key] = value
+            return parsed
+
+        decoded = json.loads(raw_answer, object_pairs_hook=reject_duplicate_keys)
+    except (json.JSONDecodeError, ValueError):
+        return "PARSE_FAILURE", "parse_failure"
+    if not isinstance(decoded, dict) or set(decoded) != {"verdict"}:
+        return "PARSE_FAILURE", "parse_failure"
+    if decoded["verdict"] not in VERDICT_SCHEMA["properties"]["verdict"]["enum"]:
+        return "PARSE_FAILURE", "parse_failure"
+    return decoded["verdict"], "ok"
 
 
 def rank_bm25(claim: str, paragraphs: List[Dict]) -> Tuple[List[int], float]:
@@ -95,10 +118,18 @@ class CachedLLMVerifier:
                 cache_key TEXT PRIMARY KEY,
                 raw_response TEXT NOT NULL,
                 verdict TEXT NOT NULL,
+                parse_status TEXT NOT NULL,
                 api_latency_sec REAL NOT NULL,
                 config_json TEXT NOT NULL
             )"""
         )
+        columns = {
+            row[1] for row in self.db.execute("PRAGMA table_info(verdict_cache)").fetchall()
+        }
+        if "parse_status" not in columns:
+            self.db.execute(
+                "ALTER TABLE verdict_cache ADD COLUMN parse_status TEXT NOT NULL DEFAULT 'ok'"
+            )
         self.db.commit()
         version_response = requests.get(f"{self.ollama_url}/api/version", timeout=5)
         version_response.raise_for_status()
@@ -116,6 +147,7 @@ class CachedLLMVerifier:
         if not self.model_digest:
             raise ValueError(f"Ollama did not provide a digest for model {model!r}")
         self.config = {
+            "ollama_url": self.ollama_url,
             "model": model,
             "model_digest": self.model_digest,
             "ollama_version": self.ollama_version,
@@ -143,15 +175,16 @@ class CachedLLMVerifier:
 
     def verify(
         self, claim: str, passage: str, force_refresh: bool = False
-    ) -> Tuple[str, float, bool]:
+    ) -> Tuple[str, float, bool, str, str]:
         k = self._key(claim, passage)
         if not self.fresh_run and not force_refresh:
             row = self.db.execute(
-                "SELECT verdict FROM verdict_cache WHERE cache_key = ?", (k,)
+                "SELECT raw_response, verdict, parse_status FROM verdict_cache WHERE cache_key = ?",
+                (k,),
             ).fetchone()
             if row is not None:
                 self.cache_hits += 1
-                return str(row[0]), 0.0, True
+                return str(row[1]), 0.0, True, str(row[0]), str(row[2])
 
         prompt = (
             "You are a scientific citation fact-checker. Given a Claim Context from a citing paper "
@@ -181,31 +214,22 @@ class CachedLLMVerifier:
         response_data = response.json()
         latency = time.perf_counter() - t0
         raw_out = response_data["message"]["content"].strip()
-        try:
-            decoded = json.loads(raw_out)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Verifier returned invalid JSON: {raw_out!r}") from exc
-        if (
-            not isinstance(decoded, dict)
-            or set(decoded) != {"verdict"}
-            or decoded["verdict"] not in VERDICT_SCHEMA["properties"]["verdict"]["enum"]
-        ):
-            raise ValueError(f"Verifier returned a response outside the schema: {raw_out!r}")
-        verdict = decoded["verdict"]
+        verdict, parse_status = parse_verifier_json(raw_out)
         self.db.execute(
             """INSERT INTO verdict_cache
-                (cache_key, raw_response, verdict, api_latency_sec, config_json)
-                VALUES (?, ?, ?, ?, ?)
+                (cache_key, raw_response, verdict, parse_status, api_latency_sec, config_json)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(cache_key) DO UPDATE SET
                     raw_response=excluded.raw_response,
                     verdict=excluded.verdict,
+                    parse_status=excluded.parse_status,
                     api_latency_sec=excluded.api_latency_sec,
                     config_json=excluded.config_json""",
-            (k, raw_out, verdict, latency, self.config_json),
+            (k, raw_out, verdict, parse_status, latency, self.config_json),
         )
         self.db.commit()
         self.cache_misses += 1
-        return verdict, latency, False
+        return verdict, latency, False, raw_out, parse_status
 
 
 def evaluate_strategy(
@@ -225,6 +249,7 @@ def evaluate_strategy(
     total_llm_sec = 0.0
     first_support_ranks: List[int] = []
     per_instance_logs: List[Dict] = []
+    parse_failure_count = 0
 
     for inst, order, r_time in tqdm(zip(instances, orders, ranking_times), total=len(instances), desc=name):
         claim = inst["claim_context"]
@@ -236,16 +261,29 @@ def evaluate_strategy(
         llm_time = 0.0
         cache_hits = 0
         cache_misses = 0
+        passage_outputs = []
         predicted = "NOT_ENOUGH_INFORMATION"
         found_rank = None
         first_verdict = None
 
         for rank_pos, p_idx in enumerate(checked_order, start=1):
             iterations += 1
-            verdict, lat, cache_hit = verifier.verify(claim, paragraphs[p_idx]["text"])
+            verdict, lat, cache_hit, raw_answer, parse_status = verifier.verify(
+                claim, paragraphs[p_idx]["text"]
+            )
             cache_hits += int(cache_hit)
             cache_misses += int(not cache_hit)
+            parse_failure_count += int(parse_status != "ok")
             llm_time += lat
+            passage_outputs.append({
+                "rank": rank_pos,
+                "passage_id": paragraphs[p_idx].get("passage_id"),
+                "verdict": verdict,
+                "raw_answer": raw_answer,
+                "parse_status": parse_status,
+                "cache_hit": cache_hit,
+                "model_api_sec": round(lat, 6),
+            })
             if first_verdict is None:
                 first_verdict = verdict
             if verdict == "SUPPORTS":
@@ -271,6 +309,7 @@ def evaluate_strategy(
             "iterations_used": iterations,
             "found_at_rank": found_rank,
             "first_verdict": first_verdict,
+            "passage_verifier_outputs": passage_outputs,
             "ranking_sec": round(r_time, 5),
             "model_api_sec": round(llm_time, 5),
             "llm_sec": round(llm_time, 5),
@@ -299,6 +338,7 @@ def evaluate_strategy(
         group_for_instance,
     )
     summary.update({
+        "parse_failure_count": parse_failure_count,
         "verifier_confirmed_positive_rate_at_rank_1_not_gold_recall": round(confirmed_at_1, 4),
         "verifier_confirmed_positive_rate_at_rank_3_not_gold_recall": round(confirmed_at_3, 4),
         "verifier_confirmed_positive_rate_at_rank_5_not_gold_recall": round(confirmed_at_5, 4),
@@ -342,6 +382,7 @@ def main() -> None:
     parser.add_argument("--split", choices=("train", "development", "test"))
     parser.add_argument("--fresh-run", action="store_true", help="Bypass cache reads and measure fresh API calls")
     parser.add_argument("--strategy-seed", type=int, default=231104, help="Seed for execution-order randomization")
+    parser.add_argument("--segmentation", choices=SEGMENTATIONS, default="90-250-word")
     parser.add_argument("--model", default="qwen2.5:3b", help="Ollama model name")
     parser.add_argument("--request-timeout", type=float, default=120.0, help="Ollama request timeout in seconds")
     parser.add_argument(
@@ -397,6 +438,20 @@ def main() -> None:
         split_name = "all"
     if not instances:
         parser.error(f"Selected {split_name} split is empty")
+    if args.segmentation != "90-250-word":
+        segmented_instances = []
+        for instance in instances:
+            passages = instance.get("passage_sets", {}).get(args.segmentation)
+            if not passages:
+                parser.error(
+                    f"{args.segmentation} passages are absent; rebuild with "
+                    "--include-segmentation-ablations"
+                )
+            updated = dict(instance)
+            updated["paragraphs"] = passages
+            updated["num_paragraphs"] = len(passages)
+            segmented_instances.append(updated)
+        instances = segmented_instances
     print(f"Loaded {len(instances)} instances from {args.dataset} ({split_name} split)")
 
     if args.request_timeout <= 0:
@@ -464,9 +519,14 @@ def main() -> None:
         comparison.append(s)
 
     paired_tests = {
-        f"{first['summary']['strategy']}__vs__{second['summary']['strategy']}": paired_cluster_permutation(
-            first["logs"], second["logs"], group_for_instance
-        )
+        f"{first['summary']['strategy']}__vs__{second['summary']['strategy']}": {
+            **paired_cluster_permutation(
+                first["logs"], second["logs"], group_for_instance
+            ),
+            **paired_cluster_bootstrap_difference(
+                first["logs"], second["logs"], group_for_instance, seed=args.strategy_seed
+            ),
+        }
         for first, second in ((res_base, res_bm25), (res_base, res_dense), (res_bm25, res_dense))
     }
     out_dir = Path(args.results_dir)
@@ -498,6 +558,7 @@ def main() -> None:
                 "label_source": "automatic citation/distractor construction; weak silver labels",
                 "split_manifest": args.split_manifest,
                 "max_checks": args.max_checks,
+                "passage_segmentation": args.segmentation,
                 "prediction_task": "binary SUPPORTS versus NOT_ENOUGH_INFORMATION",
                 "verifier_label_handling": (
                     "REFUTES and NOT_ENOUGH_INFORMATION are both negative for source-level prediction"
