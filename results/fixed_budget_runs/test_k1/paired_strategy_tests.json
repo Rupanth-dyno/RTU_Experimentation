@@ -1,0 +1,20 @@
+{
+  "Unranked_Baseline__vs__BM25_Ranked": {
+    "groups": 13,
+    "accuracy_difference": 0.0125,
+    "two_sided_p_value": 0.875,
+    "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups"
+  },
+  "Unranked_Baseline__vs__MiniLM_Dense_Ranked": {
+    "groups": 13,
+    "accuracy_difference": -0.0063,
+    "two_sided_p_value": 1.0,
+    "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups"
+  },
+  "BM25_Ranked__vs__MiniLM_Dense_Ranked": {
+    "groups": 13,
+    "accuracy_difference": -0.0187,
+    "two_sided_p_value": 0.671875,
+    "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups"
+  }
+}

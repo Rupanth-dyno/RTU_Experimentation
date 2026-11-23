@@ -1,0 +1,381 @@
+================ EXPERIMENT SUMMARY ================
+Final decision task: binary SUPPORTS vs NOT_ENOUGH_INFORMATION.
+REFUTES and NOT_ENOUGH_INFORMATION are both treated as negative; no refuted gold class is present.
+{
+  "strategy": "Unranked_Baseline",
+  "instances_evaluated": 160,
+  "independent_groups": 13,
+  "confusion_matrix": {
+    "labels": [
+      "NOT_ENOUGH_INFORMATION",
+      "SUPPORTS"
+    ],
+    "rows_true_columns_predicted": [
+      [
+        59,
+        21
+      ],
+      [
+        44,
+        36
+      ]
+    ]
+  },
+  "true_positive": 36,
+  "false_positive": 21,
+  "true_negative": 59,
+  "false_negative": 44,
+  "accuracy": 0.5938,
+  "accuracy_naive_row_level_wilson_95_ci": [
+    0.5163,
+    0.6668
+  ],
+  "accuracy_cluster_bootstrap_95_ci": [
+    0.5,
+    0.6412
+  ],
+  "support_precision": 0.6316,
+  "support_precision_cluster_bootstrap_95_ci": [
+    0.5,
+    0.7333
+  ],
+  "support_recall": 0.45,
+  "support_recall_cluster_bootstrap_95_ci": [
+    0.2708,
+    0.5645
+  ],
+  "support_f1": 0.5255,
+  "support_f1_cluster_bootstrap_95_ci": [
+    0.3714,
+    0.596
+  ],
+  "negative_accuracy": 0.7375,
+  "negative_accuracy_cluster_bootstrap_95_ci": [
+    0.5862,
+    0.8701
+  ],
+  "first_pass_support_recall": 0.45,
+  "first_pass_support_accuracy_on_positives": 0.45,
+  "first_pass_support_precision": 0.6316,
+  "median_checks": 1,
+  "p95_checks": 1,
+  "mean_checks": 1.0,
+  "total_checks": 160,
+  "cache_hits": 0,
+  "cache_misses": 160,
+  "ranking_sec": 0.0,
+  "model_api_sec": 334.264,
+  "sum_per_instance_recorded_elapsed_sec": 334.264,
+  "outcome_diagnostic_categories_not_gold_attributions": {
+    "positive_missed_within_budget": 44,
+    "support_verdict_on_negative_distractor": 21,
+    "correct_positive_decision": 36,
+    "correct_negative_decision": 59
+  },
+  "verifier_agreement": "Not measured; run scripts/evaluate_verifier_agreement.py",
+  "verifier_confirmed_positive_rate_at_rank_1_not_gold_recall": 0.45,
+  "verifier_confirmed_positive_rate_at_rank_3_not_gold_recall": 0.45,
+  "verifier_confirmed_positive_rate_at_rank_5_not_gold_recall": 0.45,
+  "verifier_confirmed_reciprocal_rank_not_gold_mrr": 0.45,
+  "positive_source_accuracy": 0.45,
+  "negative_distractor_accuracy": 0.7375,
+  "total_llm_iterations": 160,
+  "avg_iterations_per_instance": 1.0,
+  "total_ranking_sec": 0.0,
+  "total_llm_sec": 334.264,
+  "sum_ranking_and_model_api_sec": 334.264,
+  "measured_verification_wall_clock_sec": 334.695,
+  "measured_strategy_wall_clock_sec": 334.715,
+  "verifier_config": {
+    "model": "qwen2.5:3b",
+    "model_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "ollama_version": "0.40.16",
+    "prompt_version": "citation-verifier-json-v2",
+    "parser_version": "exact-json-enum-v1",
+    "system_prompt": "You are a scientific citation fact-checker. Judge only the supplied evidence.",
+    "options": {
+      "temperature": 0.0,
+      "num_predict": 64
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "SUPPORTS",
+            "REFUTES",
+            "NOT_ENOUGH_INFORMATION"
+          ]
+        }
+      },
+      "required": [
+        "verdict"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "iterations_saved_vs_baseline": 0,
+  "iterations_saved_pct": 0.0,
+  "net_time_saved_sec_vs_baseline": 0.0,
+  "net_time_saved_pct": 0.0
+}
+{
+  "strategy": "BM25_Ranked",
+  "instances_evaluated": 160,
+  "independent_groups": 13,
+  "confusion_matrix": {
+    "labels": [
+      "NOT_ENOUGH_INFORMATION",
+      "SUPPORTS"
+    ],
+    "rows_true_columns_predicted": [
+      [
+        71,
+        9
+      ],
+      [
+        58,
+        22
+      ]
+    ]
+  },
+  "true_positive": 22,
+  "false_positive": 9,
+  "true_negative": 71,
+  "false_negative": 58,
+  "accuracy": 0.5813,
+  "accuracy_naive_row_level_wilson_95_ci": [
+    0.5038,
+    0.6549
+  ],
+  "accuracy_cluster_bootstrap_95_ci": [
+    0.5169,
+    0.6702
+  ],
+  "support_precision": 0.7097,
+  "support_precision_cluster_bootstrap_95_ci": [
+    0.5455,
+    0.871
+  ],
+  "support_recall": 0.275,
+  "support_recall_cluster_bootstrap_95_ci": [
+    0.1667,
+    0.4561
+  ],
+  "support_f1": 0.3964,
+  "support_f1_cluster_bootstrap_95_ci": [
+    0.2609,
+    0.5714
+  ],
+  "negative_accuracy": 0.8875,
+  "negative_accuracy_cluster_bootstrap_95_ci": [
+    0.7857,
+    0.9524
+  ],
+  "first_pass_support_recall": 0.275,
+  "first_pass_support_accuracy_on_positives": 0.275,
+  "first_pass_support_precision": 0.7097,
+  "median_checks": 1,
+  "p95_checks": 1,
+  "mean_checks": 1.0,
+  "total_checks": 160,
+  "cache_hits": 0,
+  "cache_misses": 160,
+  "ranking_sec": 0.831,
+  "model_api_sec": 301.142,
+  "sum_per_instance_recorded_elapsed_sec": 301.972,
+  "outcome_diagnostic_categories_not_gold_attributions": {
+    "positive_missed_within_budget": 58,
+    "support_verdict_on_negative_distractor": 9,
+    "correct_positive_decision": 22,
+    "correct_negative_decision": 71
+  },
+  "verifier_agreement": "Not measured; run scripts/evaluate_verifier_agreement.py",
+  "verifier_confirmed_positive_rate_at_rank_1_not_gold_recall": 0.275,
+  "verifier_confirmed_positive_rate_at_rank_3_not_gold_recall": 0.275,
+  "verifier_confirmed_positive_rate_at_rank_5_not_gold_recall": 0.275,
+  "verifier_confirmed_reciprocal_rank_not_gold_mrr": 0.275,
+  "positive_source_accuracy": 0.275,
+  "negative_distractor_accuracy": 0.8875,
+  "total_llm_iterations": 160,
+  "avg_iterations_per_instance": 1.0,
+  "total_ranking_sec": 0.831,
+  "total_llm_sec": 301.142,
+  "sum_ranking_and_model_api_sec": 301.972,
+  "measured_verification_wall_clock_sec": 301.508,
+  "measured_strategy_wall_clock_sec": 302.383,
+  "verifier_config": {
+    "model": "qwen2.5:3b",
+    "model_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "ollama_version": "0.40.16",
+    "prompt_version": "citation-verifier-json-v2",
+    "parser_version": "exact-json-enum-v1",
+    "system_prompt": "You are a scientific citation fact-checker. Judge only the supplied evidence.",
+    "options": {
+      "temperature": 0.0,
+      "num_predict": 64
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "SUPPORTS",
+            "REFUTES",
+            "NOT_ENOUGH_INFORMATION"
+          ]
+        }
+      },
+      "required": [
+        "verdict"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "iterations_saved_vs_baseline": 0,
+  "iterations_saved_pct": 0.0,
+  "net_time_saved_sec_vs_baseline": 32.332,
+  "net_time_saved_pct": 9.66
+}
+{
+  "strategy": "MiniLM_Dense_Ranked",
+  "instances_evaluated": 160,
+  "independent_groups": 13,
+  "confusion_matrix": {
+    "labels": [
+      "NOT_ENOUGH_INFORMATION",
+      "SUPPORTS"
+    ],
+    "rows_true_columns_predicted": [
+      [
+        70,
+        10
+      ],
+      [
+        54,
+        26
+      ]
+    ]
+  },
+  "true_positive": 26,
+  "false_positive": 10,
+  "true_negative": 70,
+  "false_negative": 54,
+  "accuracy": 0.6,
+  "accuracy_naive_row_level_wilson_95_ci": [
+    0.5226,
+    0.6727
+  ],
+  "accuracy_cluster_bootstrap_95_ci": [
+    0.5233,
+    0.6695
+  ],
+  "support_precision": 0.7222,
+  "support_precision_cluster_bootstrap_95_ci": [
+    0.5556,
+    0.8333
+  ],
+  "support_recall": 0.325,
+  "support_recall_cluster_bootstrap_95_ci": [
+    0.2078,
+    0.4717
+  ],
+  "support_f1": 0.4483,
+  "support_f1_cluster_bootstrap_95_ci": [
+    0.3,
+    0.5794
+  ],
+  "negative_accuracy": 0.875,
+  "negative_accuracy_cluster_bootstrap_95_ci": [
+    0.7647,
+    0.9333
+  ],
+  "first_pass_support_recall": 0.325,
+  "first_pass_support_accuracy_on_positives": 0.325,
+  "first_pass_support_precision": 0.7222,
+  "median_checks": 1,
+  "p95_checks": 1,
+  "mean_checks": 1.0,
+  "total_checks": 160,
+  "cache_hits": 0,
+  "cache_misses": 160,
+  "ranking_sec": 43.165,
+  "model_api_sec": 352.044,
+  "sum_per_instance_recorded_elapsed_sec": 395.209,
+  "outcome_diagnostic_categories_not_gold_attributions": {
+    "positive_missed_within_budget": 54,
+    "support_verdict_on_negative_distractor": 10,
+    "correct_positive_decision": 26,
+    "correct_negative_decision": 70
+  },
+  "verifier_agreement": "Not measured; run scripts/evaluate_verifier_agreement.py",
+  "verifier_confirmed_positive_rate_at_rank_1_not_gold_recall": 0.325,
+  "verifier_confirmed_positive_rate_at_rank_3_not_gold_recall": 0.325,
+  "verifier_confirmed_positive_rate_at_rank_5_not_gold_recall": 0.325,
+  "verifier_confirmed_reciprocal_rank_not_gold_mrr": 0.325,
+  "positive_source_accuracy": 0.325,
+  "negative_distractor_accuracy": 0.875,
+  "total_llm_iterations": 160,
+  "avg_iterations_per_instance": 1.0,
+  "total_ranking_sec": 43.165,
+  "total_llm_sec": 352.044,
+  "sum_ranking_and_model_api_sec": 395.209,
+  "measured_verification_wall_clock_sec": 352.662,
+  "measured_strategy_wall_clock_sec": 395.968,
+  "verifier_config": {
+    "model": "qwen2.5:3b",
+    "model_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "ollama_version": "0.40.16",
+    "prompt_version": "citation-verifier-json-v2",
+    "parser_version": "exact-json-enum-v1",
+    "system_prompt": "You are a scientific citation fact-checker. Judge only the supplied evidence.",
+    "options": {
+      "temperature": 0.0,
+      "num_predict": 64
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "SUPPORTS",
+            "REFUTES",
+            "NOT_ENOUGH_INFORMATION"
+          ]
+        }
+      },
+      "required": [
+        "verdict"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "iterations_saved_vs_baseline": 0,
+  "iterations_saved_pct": 0.0,
+  "net_time_saved_sec_vs_baseline": -61.253,
+  "net_time_saved_pct": -18.3
+}
+Paired cluster-level permutation tests:
+{
+  "Unranked_Baseline__vs__BM25_Ranked": {
+    "groups": 13,
+    "accuracy_difference": 0.0125,
+    "two_sided_p_value": 0.875,
+    "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups"
+  },
+  "Unranked_Baseline__vs__MiniLM_Dense_Ranked": {
+    "groups": 13,
+    "accuracy_difference": -0.0063,
+    "two_sided_p_value": 1.0,
+    "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups"
+  },
+  "BM25_Ranked__vs__MiniLM_Dense_Ranked": {
+    "groups": 13,
+    "accuracy_difference": -0.0187,
+    "two_sided_p_value": 0.671875,
+    "method": "two-sided paired sign-flip permutation over connected pair/citing/source groups"
+  }
+}

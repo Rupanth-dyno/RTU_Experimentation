@@ -1,3 +1,4 @@
+EXPLORATORY HISTORICAL RESULT ONLY: this full-dataset run has no held-out grouped test split, and its cached latencies are not fresh timings. See results/legacy_exploratory_reanalysis/reanalysis.txt for confusion matrices, group-bootstrap intervals, and paired group tests.
 ================ FINAL THESIS EXPERIMENT SUMMARY ================
 {
   "strategy": "Unranked_Baseline",

@@ -14,6 +14,14 @@ reaches the configured passage limit. If no passage supports the claim, it
 predicts `NOT_ENOUGH_INFORMATION`. This is a retrieval-and-verification
 experiment; it does not train or fine-tune an LLM.
 
+The source-level classification task is binary: `SUPPORTS` versus
+`NOT_ENOUGH_INFORMATION`. The passage verifier may return `REFUTES`, but
+because the dataset has no refuting-source class, both `REFUTES` and
+`NOT_ENOUGH_INFORMATION` map to the negative source-level prediction. The
+labels are automatically constructed silver labels, not human-annotated gold
+labels; they must not be described as proof that a citation is factually
+supported.
+
 ## Data pipeline
 
 `scripts/build_dataset.py` works from locally cached PDFs in `data/pdfs/`.
@@ -52,17 +60,20 @@ cache.
 
 The experiment uses **Qwen 2.5 3B (`qwen2.5:3b`) served locally by Ollama**.
 The recorded pilot used Ollama at `http://localhost:11434`; no OpenAI service,
-API key, or cloud LLM is required. The experiment script calls Ollama's native
-`/api/chat` endpoint. It asks for one of three labels:
+API key, or cloud LLM is required. The updated experiment script calls Ollama's
+native `/api/chat` endpoint with JSON-schema-constrained output and requests
+one of three labels:
 
 - `SUPPORTS`
 - `REFUTES`
 - `NOT_ENOUGH_INFORMATION`
 
-Only `SUPPORTS` changes the experiment's prediction to positive; both other
-verdicts result in `NOT_ENOUGH_INFORMATION`. The script caches verdicts and
-latencies in `logs/llm_verification_cache.jsonl`, keyed by model, claim, and
-passage, so repeated checks can reuse prior responses.
+Only `SUPPORTS` changes the experiment's source-level prediction to positive;
+both other verdicts result in `NOT_ENOUGH_INFORMATION`. The final task is
+therefore binary, not three-class. Updated verdicts are stored in a local
+SQLite cache keyed by model digest, Ollama version, prompt/schema/parser
+versions, inference options, claim, and passage. The legacy JSONL cache and
+historical results are retained for audit but are not used by fresh runs.
 
 Install the Python dependencies and download the Ollama model before running:
 
@@ -104,7 +115,7 @@ For long full-dataset runs, use restartable 75-instance batches instead:
   --ollama-url http://localhost:11434
 ```
 
-Each completed batch is saved under `results/batches/` and skipped on restart.
+Each completed historical batch is saved under `results/batches/` and skipped on restart.
 The 800-row dataset runs as 11 batches at this size.
 If Ollama fails during a batch, restart the same command with
 `--start-index` set to the beginning row of the failed batch; the verifier
@@ -141,8 +152,72 @@ Each run writes:
 - `detailed_logs.json`: per-instance predictions, correctness, checks, and
   elapsed times.
 
-The completed pilot outputs are in `results_pilot/`. The experiment also prints
-the summary to the terminal.
+The historical pilot outputs are in `results_pilot/`. The earlier exhaustive
+results in `results/` were run on the complete dataset without a held-out
+grouped split and are exploratory, not confirmatory. Historical cached
+latencies are not fresh wall-clock measurements.
+`results/legacy_exploratory_reanalysis/` adds confusion matrices, clustered
+confidence intervals, group-level paired tests, and explicit limitations.
+
+## Confirmatory grouped evaluation
+
+Prepare a deterministic split that keeps every pair, citing paper, and source
+paper in one connected component and prevents components from crossing splits:
+
+```bash
+.venv/bin/python scripts/prepare_splits.py \
+  --dataset data/thesis_dataset.jsonl \
+  --seed 231104 \
+  --output results/splits.json
+```
+
+The split is approximately 60/20/20 for train/development/test; whole connected
+components mean exact percentages are not guaranteed. The script records the
+dataset hash and actual row counts. Use development data to choose the primary
+passage budget, then freeze it before examining test results.
+
+Run actual fresh test-set budget experiments, with cache reads bypassed, using
+the fixed budget curve:
+
+```bash
+.venv/bin/python scripts/run_budget_suite.py \
+  --dataset data/thesis_dataset.jsonl \
+  --split-manifest results/splits.json \
+  --split test \
+  --budgets 1,3,5,10,20 \
+  --model qwen2.5:3b \
+  --ollama-url http://localhost:11434
+```
+
+The test budget curve is descriptive; do not use it to choose the primary
+budget. Each run records model digest, Ollama version, prompt/schema/parser
+version, fresh wall time, and cache misses. Results include confusion matrices,
+precision/recall/F1, Wilson and connected-group bootstrap intervals, and
+paired connected-group permutation tests. The experiment is reproducible with
+the same dataset hash, split manifest, model digest, and settings.
+
+For timing repeatability, run the development split three times in separate
+result directories, varying `--strategy-seed` (for example 231104, 231105,
+231106). Each invocation uses a fresh cache namespace and randomizes strategy
+execution order. Freeze the primary budget from development results, then run
+the test split once. Report timing variation from development; do not rerun
+the test set to choose a method or budget.
+
+Repeated-call verifier agreement is measured on a deterministic sample from
+the test split. It measures repeatability, not correctness:
+
+```bash
+.venv/bin/python scripts/evaluate_verifier_agreement.py \
+  --dataset data/thesis_dataset.jsonl \
+  --split-manifest results/splits.json \
+  --split test \
+  --sample-size 100
+```
+
+`EXPERIMENT_PROTOCOL.md` specifies the split, hypothesis, metrics, and
+interpretation limits. `scripts/analyze_existing_results.py` reanalyses saved
+historical logs but explicitly marks them as exploratory and their timings as
+non-fresh.
 
 ## Recorded pilot results
 
@@ -176,6 +251,10 @@ summary and per-instance logs.
 
 ### Full-scale results
 
+The legacy table's `Recall@5` and `MRR` are based on the verifier's first
+SUPPORTS response, not on human-annotated gold evidence ranks. They are not
+retrieval Recall@K/MRR and should not be interpreted as gold retrieval metrics.
+
 | Strategy | Accuracy | Positive-source accuracy | Negative-distractor accuracy | Recall@5 | MRR | LLM checks | Avg. checks/instance | Wall time |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Unranked baseline | 60.00% | 35.75% | 84.25% | 24.25% | 0.1833 | 31,796 | 39.74 | 13h 42m 57s |
@@ -183,10 +262,11 @@ summary and per-instance logs.
 | MiniLM dense ranked | 60.00% | 35.75% | 84.25% | 22.25% | 0.1523 | 31,204 | 39.01 | 13h 32m 01s |
 
 All three strategies produced the same final predictions when allowed to
-exhaust the passages. Ranking therefore did not improve full-run accuracy.
-BM25 and MiniLM used slightly fewer verifier checks than the baseline, but
-ranking time reduced the net wall-time savings to about 1.5% and 1.3%,
-respectively.
+exhaust the passages. In this historical run, ranking did not improve final
+accuracy. The recorded BM25 and MiniLM timing differences are not evidence of
+fresh wall-time savings because the old cache reused stored model latencies.
+The grouped reanalysis is in `results/legacy_exploratory_reanalysis/`; these
+full-dataset results remain exploratory.
 
 ### Fixed-budget results
 

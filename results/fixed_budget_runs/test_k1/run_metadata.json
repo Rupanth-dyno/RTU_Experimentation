@@ -1,0 +1,49 @@
+{
+  "dataset": "data/thesis_dataset.jsonl",
+  "dataset_sha256": "51228e328bd8f7967a8ef6c97419147bd5773588a5e418969d1a650d8d3d7ea8",
+  "instances": 160,
+  "split": "test",
+  "evaluation_status": "held_out_test",
+  "label_source": "automatic citation/distractor construction; weak silver labels",
+  "split_manifest": "results/splits.json",
+  "max_checks": 1,
+  "prediction_task": "binary SUPPORTS versus NOT_ENOUGH_INFORMATION",
+  "verifier_label_handling": "REFUTES and NOT_ENOUGH_INFORMATION are both negative for source-level prediction",
+  "fresh_run": true,
+  "seed": 231104,
+  "strategy_execution_seed": 231104,
+  "strategy_execution_order": [
+    "MiniLM_Dense_Ranked",
+    "BM25_Ranked",
+    "Unranked_Baseline"
+  ],
+  "verifier_config": {
+    "model": "qwen2.5:3b",
+    "model_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "ollama_version": "0.40.16",
+    "prompt_version": "citation-verifier-json-v2",
+    "parser_version": "exact-json-enum-v1",
+    "system_prompt": "You are a scientific citation fact-checker. Judge only the supplied evidence.",
+    "options": {
+      "temperature": 0.0,
+      "num_predict": 64
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "SUPPORTS",
+            "REFUTES",
+            "NOT_ENOUGH_INFORMATION"
+          ]
+        }
+      },
+      "required": [
+        "verdict"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
